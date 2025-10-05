@@ -4,6 +4,15 @@ interface ImageFileMetadata {
   lastModified?: number;
 }
 
+export const QUEUE_UPDATED_EVENT = 'stocktake-sync-queue-updated';
+
+interface QueueEntryMetadata {
+  branch: string;
+  location: string;
+  expiryDate: string | null;
+  userId?: string;
+}
+
 interface SerializedQueuedEntry {
   id: string;
   imageDataUrl: string;
@@ -16,6 +25,7 @@ interface SerializedQueuedEntry {
   };
   quantity: number;
   unitType: 'pallet' | 'case' | 'layer';
+  metadata?: QueueEntryMetadata;
   timestamp: number;
 }
 
@@ -29,6 +39,7 @@ export type QueueEntryInput = {
   extractedData: SerializedQueuedEntry['extractedData'];
   quantity: number;
   unitType: SerializedQueuedEntry['unitType'];
+  metadata: QueueEntryMetadata;
 };
 
 const QUEUE_KEY = 'stocktake_sync_queue';
@@ -47,11 +58,13 @@ export function addToQueue(entry: QueueEntryInput): string {
     extractedData: entry.extractedData,
     quantity: entry.quantity,
     unitType: entry.unitType,
+    metadata: entry.metadata,
     timestamp: Date.now()
   };
 
   queue.push(serializedEntry);
   saveQueue(queue);
+  notifyQueueUpdate();
 
   return id;
 }
@@ -64,10 +77,12 @@ export function getQueue(): QueuedEntry[] {
 export function removeFromQueue(id: string): void {
   const queue = getStoredQueue().filter(entry => entry.id !== id);
   saveQueue(queue);
+  notifyQueueUpdate();
 }
 
 export function clearQueue(): void {
   localStorage.removeItem(QUEUE_KEY);
+  notifyQueueUpdate();
 }
 
 export function getQueueCount(): number {
@@ -99,6 +114,12 @@ function hydrateQueueEntry(entry: SerializedQueuedEntry): QueuedEntry {
   const imageFile = rebuildFileFromDataUrl(entry.imageDataUrl, entry.imageFileMetadata);
   return {
     ...entry,
+    metadata: entry.metadata ?? {
+      branch: '',
+      location: '',
+      expiryDate: null,
+      userId: undefined
+    },
     imageFile
   };
 }
@@ -144,4 +165,12 @@ function dataUrlToBlob(dataUrl: string, fallbackType?: string): Blob {
   }
 
   return new Blob([byteArray], { type: mimeType });
+}
+
+function notifyQueueUpdate(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(QUEUE_UPDATED_EVENT));
 }

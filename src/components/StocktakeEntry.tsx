@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
-import { Camera, Upload, Loader2, CheckCircle, X } from 'lucide-react';
+import { Camera, Upload, Loader2, CheckCircle, X, WifiOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { addToQueue } from '../lib/syncQueue';
 
 interface ExtractedData {
   product_name: string;
@@ -24,7 +25,9 @@ export default function StocktakeEntry() {
   const [branch, setBranch] = useState('');
   const [location, setLocation] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
-  const [success, setSuccess] = useState(false);
+  const [feedback, setFeedback] = useState<
+    { type: 'success' | 'info'; message: string }
+  | null>(null);
   const [error, setError] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -42,7 +45,7 @@ export default function StocktakeEntry() {
       };
       reader.readAsDataURL(file);
       setExtractedData(null);
-      setSuccess(false);
+      setFeedback(null);
       setError('');
     }
   }
@@ -80,10 +83,17 @@ export default function StocktakeEntry() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!imageFile || !user || !extractedData) return;
+    if (!imageFile || !user || !extractedData || !imagePreview) return;
+
+    const parsedQuantity = Number.parseInt(quantity, 10);
+    if (Number.isNaN(parsedQuantity)) {
+      setError('Please enter a valid quantity.');
+      return;
+    }
 
     setUploading(true);
     setError('');
+    setFeedback(null);
 
     try {
       const fileExt = imageFile.name.split('.').pop();
@@ -120,7 +130,7 @@ export default function StocktakeEntry() {
           extracted_barcode: extractedData.barcode,
           extracted_lot_number: extractedData.lot_number,
           extracted_pack_size: extractedData.pack_size,
-          actual_quantity: parseInt(quantity),
+          actual_quantity: parsedQuantity,
           unit_type: unitType,
           branch: branch,
           location: location,
@@ -130,18 +140,49 @@ export default function StocktakeEntry() {
 
       if (insertError) throw insertError;
 
-      setSuccess(true);
+      setFeedback({ type: 'success', message: 'Entry saved successfully!' });
       setTimeout(() => {
         resetForm();
       }, 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save entry');
+      console.error('Upload failed, queueing entry for later sync:', err);
+      try {
+        addToQueue({
+          imageFile,
+          imageDataUrl: imagePreview,
+          extractedData: {
+            product_name: extractedData.product_name,
+            barcode: extractedData.barcode,
+            lot_number: extractedData.lot_number,
+            pack_size: extractedData.pack_size
+          },
+          quantity: parsedQuantity,
+          unitType: unitType,
+          metadata: {
+            branch,
+            location,
+            expiryDate: expiryDate || null,
+            userId: user.id
+          }
+        });
+
+        resetForm({ clearFeedback: false });
+        setFeedback({ type: 'info', message: 'Saved offline – will sync later.' });
+      } catch (queueError) {
+        console.error('Failed to queue entry offline:', queueError);
+        setError(
+          queueError instanceof Error
+            ? queueError.message
+            : 'Failed to save entry'
+        );
+      }
     } finally {
       setUploading(false);
     }
   }
 
-  function resetForm() {
+  function resetForm(options: { clearFeedback?: boolean } = {}) {
+    const { clearFeedback = true } = options;
     setImagePreview(null);
     setImageFile(null);
     setExtractedData(null);
@@ -150,8 +191,10 @@ export default function StocktakeEntry() {
     setBranch('');
     setLocation('');
     setExpiryDate('');
-    setSuccess(false);
     setError('');
+    if (clearFeedback) {
+      setFeedback(null);
+    }
   }
 
   return (
@@ -159,10 +202,20 @@ export default function StocktakeEntry() {
       <div className="bg-white rounded-xl shadow-lg p-6">
         <h2 className="text-2xl font-bold text-gray-800 mb-6">New Stocktake Entry</h2>
 
-        {success && (
-          <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center">
-            <CheckCircle className="w-5 h-5 mr-2" />
-            Entry saved successfully!
+        {feedback && (
+          <div
+            className={`mb-6 px-4 py-3 rounded-lg flex items-center ${
+              feedback.type === 'success'
+                ? 'bg-green-50 border border-green-200 text-green-700'
+                : 'bg-blue-50 border border-blue-200 text-blue-700'
+            }`}
+          >
+            {feedback.type === 'success' ? (
+              <CheckCircle className="w-5 h-5 mr-2" />
+            ) : (
+              <WifiOff className="w-5 h-5 mr-2" />
+            )}
+            {feedback.message}
           </div>
         )}
 

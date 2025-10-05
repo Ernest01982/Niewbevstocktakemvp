@@ -5,7 +5,8 @@ import {
   removeFromQueue,
   clearQueue,
   rebuildFileFromDataUrl,
-  QueuedEntry
+  QueuedEntry,
+  QUEUE_UPDATED_EVENT
 } from '../lib/syncQueue';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,10 +18,16 @@ export default function SyncQueue() {
   const [syncProgress, setSyncProgress] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    function handleQueueUpdate() {
       setQueue(getQueue());
-    }, 1000);
-    return () => clearInterval(interval);
+    }
+
+    handleQueueUpdate();
+
+    window.addEventListener(QUEUE_UPDATED_EVENT, handleQueueUpdate);
+    return () => {
+      window.removeEventListener(QUEUE_UPDATED_EVENT, handleQueueUpdate);
+    };
   }, []);
 
   async function syncEntry(entry: QueuedEntry) {
@@ -65,10 +72,19 @@ export default function SyncQueue() {
         productId = product?.id || null;
       }
 
+      const metadata = entry.metadata ?? {
+        branch: '',
+        location: '',
+        expiryDate: null,
+        userId: undefined
+      };
+
+      const userIdForInsert = metadata.userId ?? user.id;
+
       const { error: insertError } = await supabase
         .from('stocktake_entries')
         .insert({
-          user_id: user.id,
+          user_id: userIdForInsert,
           product_id: productId,
           image_url: publicUrl,
           extracted_product_name: entry.extractedData.product_name,
@@ -77,6 +93,9 @@ export default function SyncQueue() {
           extracted_pack_size: entry.extractedData.pack_size,
           actual_quantity: entry.quantity,
           unit_type: entry.unitType,
+          branch: metadata.branch || null,
+          location: metadata.location || null,
+          expiry_date: metadata.expiryDate ?? null,
           synced: true
         });
 
@@ -188,6 +207,21 @@ export default function SyncQueue() {
                   <p className="text-sm text-gray-600">
                     Quantity: {entry.quantity} {entry.unitType}
                   </p>
+                  {entry.metadata.branch && (
+                    <p className="text-sm text-gray-600">
+                      Branch: {entry.metadata.branch}
+                    </p>
+                  )}
+                  {entry.metadata.location && (
+                    <p className="text-sm text-gray-600">
+                      Location: {entry.metadata.location}
+                    </p>
+                  )}
+                  {entry.metadata.expiryDate && (
+                    <p className="text-sm text-gray-600">
+                      Expiry: {entry.metadata.expiryDate}
+                    </p>
+                  )}
                   <p className="text-xs text-gray-500 mt-1">
                     Added: {new Date(entry.timestamp).toLocaleString()}
                   </p>
