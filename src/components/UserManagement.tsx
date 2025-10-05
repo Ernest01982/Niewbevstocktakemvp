@@ -24,13 +24,41 @@ export default function UserManagement() {
   async function loadUsers() {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setUsers(data || []);
+      if (profile?.role === 'admin' || profile?.role === 'manager') {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session) {
+          throw new Error('No active session');
+        }
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-user-management`,
+          {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to load users');
+        }
+
+        const data = await response.json();
+        setUsers(data || []);
+      } else {
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', profile?.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setUsers(data || []);
+      }
     } catch (error) {
       console.error('Error loading users:', error);
     } finally {
@@ -40,18 +68,34 @@ export default function UserManagement() {
 
   async function updateUserRole(userId: string, role: 'stocktaker' | 'manager' | 'admin') {
     try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({ role })
-        .eq('id', userId);
+      const { data: { session } } = await supabase.auth.getSession();
 
-      if (error) throw error;
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-user-management`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userId, role }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update user role');
+      }
 
       await loadUsers();
       setEditingUser(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating user role:', error);
-      alert('Failed to update user role');
+      alert(error.message || 'Failed to update user role');
     }
   }
 
@@ -61,17 +105,33 @@ export default function UserManagement() {
     }
 
     try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .delete()
-        .eq('id', userId);
+      const { data: { session } } = await supabase.auth.getSession();
 
-      if (error) throw error;
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-user-management`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userId }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete user');
+      }
 
       await loadUsers();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting user:', error);
-      alert('Failed to delete user');
+      alert(error.message || 'Failed to delete user');
     }
   }
 
