@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Camera, Upload, Loader2, CheckCircle, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { addToQueue } from '../lib/syncQueue';
 
 interface ExtractedData {
   product_name: string;
@@ -85,6 +86,8 @@ export default function StocktakeEntry() {
     setUploading(true);
     setError('');
 
+    const quantityNumber = parseInt(quantity, 10);
+
     try {
       const fileExt = imageFile.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
@@ -120,7 +123,7 @@ export default function StocktakeEntry() {
           extracted_barcode: extractedData.barcode,
           extracted_lot_number: extractedData.lot_number,
           extracted_pack_size: extractedData.pack_size,
-          actual_quantity: parseInt(quantity),
+          actual_quantity: quantityNumber,
           unit_type: unitType,
           branch: branch,
           location: location,
@@ -135,7 +138,25 @@ export default function StocktakeEntry() {
         resetForm();
       }, 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save entry');
+      if (!navigator.onLine && imagePreview && extractedData) {
+        addToQueue({
+          imageFile,
+          imageDataUrl: imagePreview,
+          extractedData,
+          quantity: quantityNumber,
+          unitType,
+          branch,
+          location,
+          expiryDate: expiryDate || null
+        });
+
+        setSuccess(true);
+        setTimeout(() => {
+          resetForm();
+        }, 2000);
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to save entry');
+      }
     } finally {
       setUploading(false);
     }

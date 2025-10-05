@@ -16,6 +16,9 @@ interface SerializedQueuedEntry {
   };
   quantity: number;
   unitType: 'pallet' | 'case' | 'layer';
+  branch: string;
+  location: string;
+  expiryDate: string | null;
   timestamp: number;
 }
 
@@ -29,6 +32,9 @@ export type QueueEntryInput = {
   extractedData: SerializedQueuedEntry['extractedData'];
   quantity: number;
   unitType: SerializedQueuedEntry['unitType'];
+  branch: string;
+  location: string;
+  expiryDate: SerializedQueuedEntry['expiryDate'];
 };
 
 const QUEUE_KEY = 'stocktake_sync_queue';
@@ -47,6 +53,9 @@ export function addToQueue(entry: QueueEntryInput): string {
     extractedData: entry.extractedData,
     quantity: entry.quantity,
     unitType: entry.unitType,
+    branch: entry.branch,
+    location: entry.location,
+    expiryDate: entry.expiryDate ?? null,
     timestamp: Date.now()
   };
 
