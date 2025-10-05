@@ -48,7 +48,7 @@ function extractProductInfo(text: string): ExtractedData {
     
     if (!lotNumber) {
       if (upperLine.includes('LOT') || upperLine.includes('BATCH')) {
-        const lotMatch = line.match(/(?:LOT|BATCH)[:\s#]*([A-Z0-9\-]+)/i);
+        const lotMatch = line.match(/(?:LOT|BATCH)[:\s#]*([A-Z0-9-]+)/i);
         if (lotMatch) {
           lotNumber = lotMatch[1];
         } else if (i + 1 < lines.length) {

@@ -64,6 +64,9 @@ export interface VarianceReport {
   actual_quantity: number;
   variance: number;
   variance_percentage: number;
+  expected_units?: number | null;
+  actual_units?: number | null;
+  lot_number?: string | null;
   status: 'pending' | 'reviewed' | 'resolved';
   reviewed_by: string | null;
   notes: string;
