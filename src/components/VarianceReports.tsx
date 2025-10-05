@@ -170,18 +170,22 @@ export default function VarianceReports() {
                     <h3 className="font-semibold text-gray-800 text-lg mb-2">
                       {report.product?.product_name || 'Unknown Product'}
                     </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                       <div>
                         <span className="text-gray-600">Barcode:</span>
-                        <p className="font-medium">{report.product?.barcode || 'N/A'}</p>
+                        <p className="font-medium font-mono">{report.product?.barcode || 'N/A'}</p>
                       </div>
                       <div>
-                        <span className="text-gray-600">Expected:</span>
-                        <p className="font-medium">{report.expected_quantity}</p>
+                        <span className="text-gray-600">Lot:</span>
+                        <p className="font-medium">{(report as any).lot_number || 'N/A'}</p>
                       </div>
                       <div>
-                        <span className="text-gray-600">Actual:</span>
-                        <p className="font-medium">{report.actual_quantity}</p>
+                        <span className="text-gray-600">Expected (units):</span>
+                        <p className="font-medium">{(report as any).expected_units || report.expected_quantity}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Actual (units):</span>
+                        <p className="font-medium">{(report as any).actual_units || report.actual_quantity}</p>
                       </div>
                       <div>
                         <span className="text-gray-600">Variance:</span>

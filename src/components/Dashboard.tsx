@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { Camera, FileText, Users, LogOut, Menu, X, Upload, FileSpreadsheet } from 'lucide-react';
+import { Camera, FileText, Users, LogOut, Menu, X, Upload, FileSpreadsheet, Package } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import StocktakeEntry from './StocktakeEntry';
 import VarianceReports from './VarianceReports';
 import UserManagement from './UserManagement';
 import SyncQueue from './SyncQueue';
 import BulkUpload from './BulkUpload';
+import PalletConfiguration from './PalletConfiguration';
 
-type Page = 'stocktake' | 'variance' | 'users' | 'sync' | 'bulk';
+type Page = 'stocktake' | 'variance' | 'users' | 'sync' | 'bulk' | 'pallet';
 
 export default function Dashboard() {
   const { profile, signOut } = useAuth();
@@ -31,6 +32,7 @@ export default function Dashboard() {
         return true;
       case 'bulk':
       case 'variance':
+      case 'pallet':
         return ['manager', 'admin'].includes(profile.role);
       case 'users':
         return profile.role === 'admin';
@@ -45,6 +47,8 @@ export default function Dashboard() {
         return <StocktakeEntry />;
       case 'bulk':
         return <BulkUpload />;
+      case 'pallet':
+        return <PalletConfiguration />;
       case 'variance':
         return <VarianceReports />;
       case 'users':
@@ -104,6 +108,20 @@ export default function Dashboard() {
                 >
                   <FileSpreadsheet className="w-4 h-4" />
                   Bulk Upload
+                </button>
+              )}
+
+              {canAccessPage('pallet') && (
+                <button
+                  onClick={() => setCurrentPage('pallet')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                    currentPage === 'pallet'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Package className="w-4 h-4" />
+                  Pallet Config
                 </button>
               )}
 
@@ -206,6 +224,23 @@ export default function Dashboard() {
                 >
                   <FileSpreadsheet className="w-5 h-5" />
                   Bulk Upload
+                </button>
+              )}
+
+              {canAccessPage('pallet') && (
+                <button
+                  onClick={() => {
+                    setCurrentPage('pallet');
+                    setMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${
+                    currentPage === 'pallet'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Package className="w-5 h-5" />
+                  Pallet Configuration
                 </button>
               )}
 

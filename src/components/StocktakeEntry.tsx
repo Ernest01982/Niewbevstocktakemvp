@@ -36,7 +36,9 @@ export default function StocktakeEntry() {
       setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreview(reader.result as string);
+        const result = reader.result as string;
+        setImagePreview(result);
+        handleExtract(result);
       };
       reader.readAsDataURL(file);
       setExtractedData(null);
@@ -45,15 +47,14 @@ export default function StocktakeEntry() {
     }
   }
 
-  async function handleExtract() {
-    if (!imagePreview) return;
+  async function handleExtract(imageData?: string) {
+    const dataToUse = imageData || imagePreview;
+    if (!dataToUse) return;
 
     setExtracting(true);
     setError('');
 
     try {
-      const base64Image = imagePreview.split(',')[1];
-
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-product-info`;
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -61,7 +62,7 @@ export default function StocktakeEntry() {
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ image_base64: imagePreview })
+        body: JSON.stringify({ image_base64: dataToUse })
       });
 
       if (!response.ok) {
@@ -222,22 +223,11 @@ export default function StocktakeEntry() {
               </button>
             </div>
 
-            {!extractedData && (
-              <button
-                type="button"
-                onClick={handleExtract}
-                disabled={extracting}
-                className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-              >
-                {extracting ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Extracting data...
-                  </>
-                ) : (
-                  'Extract Product Info'
-                )}
-              </button>
+            {extracting && (
+              <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg flex items-center justify-center gap-2">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Extracting product information...
+              </div>
             )}
 
             {extractedData && (
