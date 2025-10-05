@@ -12,13 +12,31 @@ interface ExtractedData {
   message?: string;
 }
 
+interface ProductData {
+  product_name: string;
+  barcode: string;
+  lot_number: string;
+  pack_size: string;
+}
+
+function createEmptyProductData(): ProductData {
+  return {
+    product_name: '',
+    barcode: '',
+    lot_number: '',
+    pack_size: '',
+  };
+}
+
 export default function StocktakeEntry() {
   const { user } = useAuth();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
+  const [productData, setProductData] = useState<ProductData | null>(null);
+  const [extractionInfo, setExtractionInfo] = useState<{ mock?: boolean; message?: string } | null>(null);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState('');
   const [unitType, setUnitType] = useState<'pallet' | 'case' | 'layer'>('case');
   const [branch, setBranch] = useState('');
@@ -30,10 +48,20 @@ export default function StocktakeEntry() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  function updateProductData(field: keyof ProductData, value: string) {
+    setProductData((prev) => {
+      const base = prev ?? createEmptyProductData();
+      return { ...base, [field]: value };
+    });
+  }
+
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) {
       setImageFile(file);
+      setProductData(createEmptyProductData());
+      setExtractionInfo(null);
+      setExtractionError(null);
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = reader.result as string;
@@ -41,7 +69,6 @@ export default function StocktakeEntry() {
         handleExtract(result);
       };
       reader.readAsDataURL(file);
-      setExtractedData(null);
       setSuccess(false);
       setError('');
     }
@@ -52,7 +79,7 @@ export default function StocktakeEntry() {
     if (!dataToUse) return;
 
     setExtracting(true);
-    setError('');
+    setExtractionError(null);
 
     try {
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-product-info`;
@@ -70,9 +97,15 @@ export default function StocktakeEntry() {
       }
 
       const data: ExtractedData = await response.json();
-      setExtractedData(data);
+      setProductData({
+        product_name: data.product_name || '',
+        barcode: data.barcode || '',
+        lot_number: data.lot_number || '',
+        pack_size: data.pack_size || '',
+      });
+      setExtractionInfo({ mock: data.mock, message: data.message });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to extract data');
+      setExtractionError(err instanceof Error ? err.message : 'Failed to extract data');
     } finally {
       setExtracting(false);
     }
@@ -80,7 +113,7 @@ export default function StocktakeEntry() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!imageFile || !user || !extractedData) return;
+    if (!imageFile || !user) return;
 
     setUploading(true);
     setError('');
@@ -100,11 +133,11 @@ export default function StocktakeEntry() {
         .getPublicUrl(fileName);
 
       let productId = null;
-      if (extractedData.barcode) {
+      if (productData?.barcode) {
         const { data: product } = await supabase
           .from('products')
           .select('id')
-          .eq('barcode', extractedData.barcode)
+          .eq('barcode', productData.barcode)
           .maybeSingle();
 
         productId = product?.id || null;
@@ -116,11 +149,11 @@ export default function StocktakeEntry() {
           user_id: user.id,
           product_id: productId,
           image_url: publicUrl,
-          extracted_product_name: extractedData.product_name,
-          extracted_barcode: extractedData.barcode,
-          extracted_lot_number: extractedData.lot_number,
-          extracted_pack_size: extractedData.pack_size,
-          actual_quantity: parseInt(quantity),
+          extracted_product_name: productData?.product_name || null,
+          extracted_barcode: productData?.barcode || null,
+          extracted_lot_number: productData?.lot_number || null,
+          extracted_pack_size: productData?.pack_size || null,
+          actual_quantity: parseInt(quantity, 10),
           unit_type: unitType,
           branch: branch,
           location: location,
@@ -144,7 +177,9 @@ export default function StocktakeEntry() {
   function resetForm() {
     setImagePreview(null);
     setImageFile(null);
-    setExtractedData(null);
+    setProductData(null);
+    setExtractionInfo(null);
+    setExtractionError(null);
     setQuantity('');
     setUnitType('case');
     setBranch('');
@@ -230,152 +265,165 @@ export default function StocktakeEntry() {
               </div>
             )}
 
-            {extractedData && (
-              <>
-                {extractedData.mock && (
-                  <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg text-sm">
-                    {extractedData.message}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Product Name
-                    </label>
-                    <input
-                      type="text"
-                      value={extractedData.product_name}
-                      onChange={(e) => setExtractedData({ ...extractedData, product_name: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Barcode
-                    </label>
-                    <input
-                      type="text"
-                      value={extractedData.barcode}
-                      onChange={(e) => setExtractedData({ ...extractedData, barcode: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Lot Number
-                    </label>
-                    <input
-                      type="text"
-                      value={extractedData.lot_number}
-                      onChange={(e) => setExtractedData({ ...extractedData, lot_number: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Pack Size
-                    </label>
-                    <input
-                      type="text"
-                      value={extractedData.pack_size}
-                      onChange={(e) => setExtractedData({ ...extractedData, pack_size: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Branch *
-                    </label>
-                    <input
-                      type="text"
-                      value={branch}
-                      onChange={(e) => setBranch(e.target.value)}
-                      required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="e.g., Main Warehouse"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Location *
-                    </label>
-                    <input
-                      type="text"
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      required
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="e.g., A-01"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Expiry Date
-                    </label>
-                    <input
-                      type="date"
-                      value={expiryDate}
-                      onChange={(e) => setExpiryDate(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Quantity *
-                    </label>
-                    <input
-                      type="number"
-                      value={quantity}
-                      onChange={(e) => setQuantity(e.target.value)}
-                      required
-                      min="0"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter quantity"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Unit Type *
-                    </label>
-                    <select
-                      value={unitType}
-                      onChange={(e) => setUnitType(e.target.value as 'pallet' | 'case' | 'layer')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="pallet">Pallet</option>
-                      <option value="case">Case</option>
-                      <option value="layer">Layer</option>
-                    </select>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={uploading || !quantity || !branch || !location}
-                  className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-                >
-                  {uploading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Entry'
-                  )}
-                </button>
-              </>
+            {extractionInfo?.mock && extractionInfo.message && (
+              <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg text-sm">
+                {extractionInfo.message}
+              </div>
             )}
+
+            {extractionError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="font-medium">We couldn't extract product details automatically.</p>
+                  <p className="text-sm">{extractionError}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleExtract()}
+                  disabled={extracting}
+                  className="inline-flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                >
+                  Retry extraction
+                </button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Product Name
+                </label>
+                <input
+                  type="text"
+                  value={productData?.product_name ?? ''}
+                  onChange={(e) => updateProductData('product_name', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Barcode
+                </label>
+                <input
+                  type="text"
+                  value={productData?.barcode ?? ''}
+                  onChange={(e) => updateProductData('barcode', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Lot Number
+                </label>
+                <input
+                  type="text"
+                  value={productData?.lot_number ?? ''}
+                  onChange={(e) => updateProductData('lot_number', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Pack Size
+                </label>
+                <input
+                  type="text"
+                  value={productData?.pack_size ?? ''}
+                  onChange={(e) => updateProductData('pack_size', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Branch *
+                </label>
+                <input
+                  type="text"
+                  value={branch}
+                  onChange={(e) => setBranch(e.target.value)}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g., Main Warehouse"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Location *
+                </label>
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g., A-01"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Expiry Date
+                </label>
+                <input
+                  type="date"
+                  value={expiryDate}
+                  onChange={(e) => setExpiryDate(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Quantity *
+                </label>
+                <input
+                  type="number"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  required
+                  min="0"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter quantity"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Unit Type *
+                </label>
+                <select
+                  value={unitType}
+                  onChange={(e) => setUnitType(e.target.value as 'pallet' | 'case' | 'layer')}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="pallet">Pallet</option>
+                  <option value="case">Case</option>
+                  <option value="layer">Layer</option>
+                </select>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={uploading || !quantity || !branch || !location}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Entry'
+              )}
+            </button>
           </form>
         )}
       </div>
