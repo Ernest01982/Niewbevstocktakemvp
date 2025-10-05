@@ -131,7 +131,7 @@ export default function BulkUpload() {
         .update({
           records_success: successCount,
           records_failed: failedCount,
-          status: failedCount === 0 ? 'completed' : 'completed',
+          status: failedCount === 0 ? 'completed' : 'failed',
           error_log: errors
         })
         .eq('id', upload.id);
