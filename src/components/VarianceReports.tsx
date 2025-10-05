@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, TrendingUp, TrendingDown, CheckCircle, FileText } from 'lucide-react';
 import { supabase, VarianceReport, Product } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
-type VarianceReportWithProduct = VarianceReport & { product: Product };
+type VarianceReportWithProduct = VarianceReport & { product: Product | null };
 
 export default function VarianceReports() {
   const { profile } = useAuth();
@@ -14,11 +14,7 @@ export default function VarianceReports() {
   const [reviewNotes, setReviewNotes] = useState('');
   const [updating, setUpdating] = useState(false);
 
-  useEffect(() => {
-    loadReports();
-  }, [filter]);
-
-  async function loadReports() {
+  const loadReports = useCallback(async () => {
     try {
       setLoading(true);
       let query = supabase
@@ -42,7 +38,11 @@ export default function VarianceReports() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [filter]);
+
+  useEffect(() => {
+    loadReports();
+  }, [loadReports]);
 
   async function updateReportStatus(reportId: string, status: 'reviewed' | 'resolved', notes: string) {
     if (!profile) return;
@@ -177,15 +177,15 @@ export default function VarianceReports() {
                       </div>
                       <div>
                         <span className="text-gray-600">Lot:</span>
-                        <p className="font-medium">{(report as any).lot_number || 'N/A'}</p>
+                        <p className="font-medium">{report.lot_number || 'N/A'}</p>
                       </div>
                       <div>
                         <span className="text-gray-600">Expected (units):</span>
-                        <p className="font-medium">{(report as any).expected_units || report.expected_quantity}</p>
+                        <p className="font-medium">{report.expected_units ?? report.expected_quantity}</p>
                       </div>
                       <div>
                         <span className="text-gray-600">Actual (units):</span>
-                        <p className="font-medium">{(report as any).actual_units || report.actual_quantity}</p>
+                        <p className="font-medium">{report.actual_units ?? report.actual_quantity}</p>
                       </div>
                       <div>
                         <span className="text-gray-600">Variance:</span>

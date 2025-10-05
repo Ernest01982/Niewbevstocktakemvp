@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Users, CreditCard as Edit, Trash2, UserPlus, Shield, Eye, EyeOff } from 'lucide-react';
 import { supabase, UserProfile } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,11 +17,21 @@ export default function UserManagement() {
   const [creating, setCreating] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
 
-  useEffect(() => {
-    loadUsers();
+  const getErrorMessage = useCallback((error: unknown): string => {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    if (typeof error === 'string') {
+      return error;
+    }
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return 'An unexpected error occurred';
+    }
   }, []);
 
-  async function loadUsers() {
+  const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -43,8 +53,8 @@ export default function UserManagement() {
         );
 
         if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to load users');
+          const errorBody = (await response.json()) as { error?: string };
+          throw new Error(errorBody.error || 'Failed to load users');
         }
 
         const data = await response.json();
@@ -64,7 +74,11 @@ export default function UserManagement() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [profile]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
   async function updateUserRole(userId: string, role: 'stocktaker' | 'manager' | 'admin') {
     try {
@@ -93,9 +107,9 @@ export default function UserManagement() {
 
       await loadUsers();
       setEditingUser(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating user role:', error);
-      alert(error.message || 'Failed to update user role');
+      alert(getErrorMessage(error));
     }
   }
 
@@ -129,9 +143,9 @@ export default function UserManagement() {
       }
 
       await loadUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting user:', error);
-      alert(error.message || 'Failed to delete user');
+      alert(getErrorMessage(error));
     }
   }
 
@@ -158,7 +172,11 @@ export default function UserManagement() {
         })
       });
 
-      const data = await response.json();
+      const data = (await response.json()) as {
+        user?: { id?: string };
+        msg?: string;
+        error_description?: string;
+      };
 
       if (!response.ok) {
         throw new Error(data.msg || data.error_description || 'Failed to create user');
@@ -180,9 +198,9 @@ export default function UserManagement() {
       setNewUserFullName('');
       setNewUserRole('stocktaker');
       await loadUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating user:', error);
-      alert(error.message || 'Failed to create user');
+      alert(getErrorMessage(error));
     } finally {
       setCreating(false);
     }
