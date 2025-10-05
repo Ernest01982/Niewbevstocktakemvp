@@ -1,12 +1,20 @@
 import { useState, useEffect } from 'react';
 import { Users, CreditCard as Edit, Trash2, UserPlus, Shield } from 'lucide-react';
 import { supabase, UserProfile } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function UserManagement() {
+  const { profile } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [newRole, setNewRole] = useState<'stocktaker' | 'manager' | 'admin'>('stocktaker');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserFullName, setNewUserFullName] = useState('');
+  const [newUserRole, setNewUserRole] = useState<'stocktaker' | 'manager' | 'admin'>('stocktaker');
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -66,6 +74,81 @@ export default function UserManagement() {
     }
   }
 
+  async function createUser() {
+    if (!newUserEmail || !newUserPassword || !newUserFullName) {
+      alert('Please fill in all fields');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({
+          email: newUserEmail,
+          password: newUserPassword,
+          data: {
+            full_name: newUserFullName
+          }
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.msg || data.error_description || 'Failed to create user');
+      }
+
+      if (data.user?.id) {
+        const { error: updateError } = await supabase
+          .from('user_profiles')
+          .update({ role: newUserRole })
+          .eq('id', data.user.id);
+
+        if (updateError) throw updateError;
+      }
+
+      alert('User created successfully!');
+      setShowCreateModal(false);
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setNewUserFullName('');
+      setNewUserRole('stocktaker');
+      await loadUsers();
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      alert(error.message || 'Failed to create user');
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  function getAvailableRolesForCreation(): ('stocktaker' | 'manager' | 'admin')[] {
+    if (profile?.role === 'admin') {
+      return ['stocktaker', 'manager', 'admin'];
+    }
+    if (profile?.role === 'manager') {
+      return ['stocktaker'];
+    }
+    return [];
+  }
+
+  function getAvailableRolesForEdit(currentUserRole: string): ('stocktaker' | 'manager' | 'admin')[] {
+    if (profile?.role === 'admin') {
+      return ['stocktaker', 'manager', 'admin'];
+    }
+    if (profile?.role === 'manager' && currentUserRole === 'stocktaker') {
+      return ['stocktaker'];
+    }
+    return [];
+  }
+
+  const canCreateUsers = profile?.role === 'admin' || profile?.role === 'manager';
+
   function getRoleBadgeColor(role: string) {
     switch (role) {
       case 'admin':
@@ -96,9 +179,20 @@ export default function UserManagement() {
             <Users className="w-7 h-7" />
             User Management
           </h2>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Shield className="w-5 h-5" />
-            <span>{users.length} Total Users</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Shield className="w-5 h-5" />
+              <span>{users.length} Total Users</span>
+            </div>
+            {canCreateUsers && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-all flex items-center gap-2"
+              >
+                <UserPlus className="w-5 h-5" />
+                Create User
+              </button>
+            )}
           </div>
         </div>
 
@@ -131,23 +225,27 @@ export default function UserManagement() {
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => {
-                          setEditingUser(user);
-                          setNewRole(user.role);
-                        }}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                        title="Edit role"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => deleteUser(user.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                        title="Delete user"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {getAvailableRolesForEdit(user.role).length > 0 && (
+                        <button
+                          onClick={() => {
+                            setEditingUser(user);
+                            setNewRole(user.role);
+                          }}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                          title="Edit role"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      )}
+                      {profile?.role === 'admin' && (
+                        <button
+                          onClick={() => deleteUser(user.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          title="Delete user"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -184,13 +282,15 @@ export default function UserManagement() {
                 onChange={(e) => setNewRole(e.target.value as 'stocktaker' | 'manager' | 'admin')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="stocktaker">Stocktaker</option>
-                <option value="manager">Manager</option>
-                <option value="admin">Admin</option>
+                {getAvailableRolesForEdit(editingUser.role).map(role => (
+                  <option key={role} value={role}>
+                    {role.charAt(0).toUpperCase() + role.slice(1)}
+                  </option>
+                ))}
               </select>
               <p className="mt-2 text-xs text-gray-500">
-                {newRole === 'stocktaker' && 'Can only create stocktake entries'}
-                {newRole === 'manager' && 'Can view all entries and variance reports'}
+                {newRole === 'stocktaker' && 'Can create stocktake entries'}
+                {newRole === 'manager' && 'Can view all entries, manage variance reports, and create stocktakers'}
                 {newRole === 'admin' && 'Full access including user management'}
               </p>
             </div>
@@ -205,6 +305,99 @@ export default function UserManagement() {
               <button
                 onClick={() => setEditingUser(null)}
                 className="px-6 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">Create New User</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  value={newUserFullName}
+                  onChange={(e) => setNewUserFullName(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter full name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="user@example.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Password *
+                </label>
+                <input
+                  type="password"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Minimum 6 characters"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Role *
+                </label>
+                <select
+                  value={newUserRole}
+                  onChange={(e) => setNewUserRole(e.target.value as 'stocktaker' | 'manager' | 'admin')}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  {getAvailableRolesForCreation().map(role => (
+                    <option key={role} value={role}>
+                      {role.charAt(0).toUpperCase() + role.slice(1)}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-xs text-gray-500">
+                  {profile?.role === 'admin' && 'Admins can create stocktakers, managers, and other admins'}
+                  {profile?.role === 'manager' && 'Managers can create stocktakers only'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-6">
+              <button
+                onClick={createUser}
+                disabled={creating}
+                className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-all"
+              >
+                {creating ? 'Creating...' : 'Create User'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setNewUserEmail('');
+                  setNewUserPassword('');
+                  setNewUserFullName('');
+                  setNewUserRole('stocktaker');
+                }}
+                disabled={creating}
+                className="px-6 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 disabled:opacity-50 transition-all"
               >
                 Cancel
               </button>
