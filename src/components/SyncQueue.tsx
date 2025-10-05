@@ -77,6 +77,9 @@ export default function SyncQueue() {
           extracted_pack_size: entry.extractedData.pack_size,
           actual_quantity: entry.quantity,
           unit_type: entry.unitType,
+          branch: entry.branch,
+          location: entry.location,
+          expiry_date: entry.expiryDate || null,
           synced: true
         });
 
@@ -187,6 +190,15 @@ export default function SyncQueue() {
                   </p>
                   <p className="text-sm text-gray-600">
                     Quantity: {entry.quantity} {entry.unitType}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Branch: {entry.branch}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Location: {entry.location}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Expiry Date: {entry.expiryDate || 'N/A'}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
                     Added: {new Date(entry.timestamp).toLocaleString()}
