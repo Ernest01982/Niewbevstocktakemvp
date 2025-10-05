@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Download } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, ProductImportRow } from '../lib/supabase';
+import { loadXLSX } from '../lib/xlsxLoader';
 
 export default function BulkUpload() {
   const { user } = useAuth();
@@ -14,38 +15,34 @@ export default function BulkUpload() {
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  function downloadTemplate() {
-    const headers = [
-      'Product Number',
-      'Product Description',
-      'Lot',
-      'Expiry Date',
-      'Branch',
-      'Location',
-      'Stock on Hand',
-      'Allocated Stock',
-      'Available Stock'
-    ];
+  async function downloadTemplate() {
+    try {
+      const XLSX = await loadXLSX();
+      const headers = [
+        'Product Number',
+        'Product Description',
+        'Lot',
+        'Expiry Date',
+        'Branch',
+        'Location',
+        'Stock on Hand',
+        'Allocated Stock',
+        'Available Stock'
+      ];
 
-    const sampleData = [
-      ['1234567890123', 'Premium Coffee Beans', 'LOT2024001', '2025-12-31', 'Main Warehouse', 'A-01', '100', '10', '90'],
-      ['9876543210987', 'Organic Tea Leaves', 'LOT2024002', '2025-11-30', 'Main Warehouse', 'A-02', '150', '20', '130']
-    ];
+      const sampleData = [
+        ['1234567890123', 'Premium Coffee Beans', 'LOT2024001', '2025-12-31', 'Main Warehouse', 'A-01', '100', '10', '90'],
+        ['9876543210987', 'Organic Tea Leaves', 'LOT2024002', '2025-11-30', 'Main Warehouse', 'A-02', '150', '20', '130']
+      ];
 
-    const csvContent = [
-      headers.join(','),
-      ...sampleData.map(row => row.join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'stocktake_template.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Stocktake');
+      XLSX.writeFile(workbook, 'stocktake_template.xlsx');
+    } catch (error) {
+      console.error('Template download error:', error);
+      alert('Failed to generate Excel template.');
+    }
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -56,15 +53,7 @@ export default function BulkUpload() {
     setResult(null);
 
     try {
-      const text = await file.text();
-      const lines = text.split('\n').filter(line => line.trim());
-
-      if (lines.length < 2) {
-        throw new Error('File must contain headers and at least one data row');
-      }
-
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-      const rows = lines.slice(1);
+      const { headers, rows, rowNumbers } = await parseDataFile(file);
 
       const uploadRecord = {
         user_id: user.id,
@@ -89,9 +78,8 @@ export default function BulkUpload() {
       const errors: Array<{ row: number; error: string }> = [];
 
       for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const values = parseCSVRow(row);
-        const rowNum = i + 2;
+        const values = rows[i];
+        const rowNum = rowNumbers[i] ?? i + 2;
 
         try {
           const product = parseProductRow(headers, values);
@@ -153,6 +141,53 @@ export default function BulkUpload() {
     }
   }
 
+  async function parseDataFile(file: File): Promise<{ headers: string[]; rows: string[][]; rowNumbers: number[] }> {
+    const lowerName = file.name.toLowerCase();
+    if (lowerName.endsWith('.xlsx')) {
+      const XLSX = await loadXLSX();
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rawData: Array<Array<string | number | undefined>> = XLSX.utils.sheet_to_json(sheet, {
+        header: 1,
+        raw: false
+      });
+
+      const filtered = rawData.filter(row =>
+        Array.isArray(row) && row.some(cell => (cell ?? '').toString().trim() !== '')
+      );
+
+      if (filtered.length < 2) {
+        throw new Error('File must contain headers and at least one data row');
+      }
+
+      const headers = filtered[0].map(cell => (cell ?? '').toString().trim().toLowerCase());
+      const rows = filtered.slice(1).map(row =>
+        headers.map((_, idx) => (row[idx] ?? '').toString().trim())
+      );
+      const rowNumbers = rows.map((_, idx) => idx + 2);
+      return { headers, rows, rowNumbers };
+    }
+
+    const text = await file.text();
+    const lines = text
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(line => line);
+
+    if (lines.length < 2) {
+      throw new Error('File must contain headers and at least one data row');
+    }
+
+    const headers = parseCSVRow(lines[0]).map(h => h.toLowerCase());
+    const rows = lines.slice(1).map(line => {
+      const parsed = parseCSVRow(line);
+      return headers.map((_, idx) => (parsed[idx] ?? '').trim());
+    });
+    const rowNumbers = rows.map((_, idx) => idx + 2);
+    return { headers, rows, rowNumbers };
+  }
+
   function parseCSVRow(row: string): string[] {
     const values: string[] = [];
     let current = '';
@@ -202,9 +237,9 @@ export default function BulkUpload() {
         </h2>
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <h3 className="font-semibold text-blue-900 mb-2">CSV Format Required</h3>
+          <h3 className="font-semibold text-blue-900 mb-2">Excel or CSV Format</h3>
           <p className="text-sm text-blue-800 mb-3">
-            Upload a CSV file with the following columns:
+            Upload an Excel (.xlsx) or CSV file with the following columns:
           </p>
           <ul className="text-sm text-blue-800 space-y-1 ml-4">
             <li>• Product Number (Barcode/SKU)</li>
@@ -225,14 +260,14 @@ export default function BulkUpload() {
             className="w-full bg-gray-600 text-white py-3 rounded-lg font-medium hover:bg-gray-700 transition-all flex items-center justify-center gap-2"
           >
             <Download className="w-5 h-5" />
-            Download CSV Template
+            Download Excel Template
           </button>
 
           <div className="relative">
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,.txt"
+              accept=".xlsx,.csv,.txt"
               onChange={handleFileUpload}
               disabled={uploading}
               className="hidden"
@@ -243,7 +278,7 @@ export default function BulkUpload() {
               className="w-full bg-blue-600 text-white py-4 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
             >
               <Upload className="w-5 h-5" />
-              {uploading ? 'Processing...' : 'Upload CSV File'}
+              {uploading ? 'Processing...' : 'Upload File (.xlsx or .csv)'}
             </button>
           </div>
         </div>
