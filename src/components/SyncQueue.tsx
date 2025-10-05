@@ -1,12 +1,18 @@
 import { useState, useEffect } from 'react';
 import { Upload, Trash2, CheckCircle, Loader2 } from 'lucide-react';
-import { getQueue, removeFromQueue, clearQueue } from '../lib/syncQueue';
+import {
+  getQueue,
+  removeFromQueue,
+  clearQueue,
+  rebuildFileFromDataUrl,
+  QueuedEntry
+} from '../lib/syncQueue';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function SyncQueue() {
   const { user } = useAuth();
-  const [queue, setQueue] = useState(getQueue());
+  const [queue, setQueue] = useState<QueuedEntry[]>(getQueue());
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<Record<string, string>>({});
 
@@ -17,18 +23,30 @@ export default function SyncQueue() {
     return () => clearInterval(interval);
   }, []);
 
-  async function syncEntry(entry: typeof queue[0]) {
+  async function syncEntry(entry: QueuedEntry) {
     if (!user) return;
 
     try {
       setSyncProgress(prev => ({ ...prev, [entry.id]: 'uploading' }));
 
-      const fileExt = entry.imageFile.name.split('.').pop();
+      const uploadSource =
+        entry.imageFile ??
+        rebuildFileFromDataUrl(entry.imageDataUrl, entry.imageFileMetadata);
+
+      if (!uploadSource) {
+        throw new Error('Unable to reconstruct image file for upload');
+      }
+
+      const originalName = entry.imageFileMetadata.name || 'image';
+      const fileExtFromName = originalName.includes('.')
+        ? originalName.split('.').pop()
+        : undefined;
+      const fileExt = fileExtFromName || entry.imageFileMetadata.type.split('/').pop() || 'bin';
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('stocktake-images')
-        .upload(fileName, entry.imageFile);
+        .upload(fileName, uploadSource);
 
       if (uploadError) throw uploadError;
 
