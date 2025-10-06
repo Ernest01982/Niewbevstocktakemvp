@@ -1,5 +1,17 @@
-import { useState } from 'react';
-import { Camera, FileText, Users, LogOut, Menu, X, Upload, FileSpreadsheet, Package } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import {
+  Camera,
+  ClipboardList,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  LogOut,
+  Menu,
+  Package,
+  Upload,
+  Users,
+  X
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import StocktakeEntry from './StocktakeEntry';
 import VarianceReports from './VarianceReports';
@@ -7,8 +19,10 @@ import UserManagement from './UserManagement';
 import SyncQueue from './SyncQueue';
 import BulkUpload from './BulkUpload';
 import PalletConfiguration from './PalletConfiguration';
+import Recounts from './Recounts';
+import ExportCounts from './ExportCounts';
 
-type Page = 'stocktake' | 'variance' | 'users' | 'sync' | 'bulk' | 'pallet';
+type Page = 'stocktake' | 'recounts' | 'variance' | 'users' | 'sync' | 'bulk' | 'pallet' | 'export';
 
 export default function Dashboard() {
   const { profile, signOut } = useAuth();
@@ -28,11 +42,13 @@ export default function Dashboard() {
 
     switch (page) {
       case 'stocktake':
+      case 'recounts':
       case 'sync':
         return true;
       case 'bulk':
       case 'variance':
       case 'pallet':
+      case 'export':
         return ['manager', 'admin'].includes(profile.role);
       case 'users':
         return profile.role === 'admin';
@@ -45,6 +61,8 @@ export default function Dashboard() {
     switch (currentPage) {
       case 'stocktake':
         return <StocktakeEntry />;
+      case 'recounts':
+        return <Recounts />;
       case 'bulk':
         return <BulkUpload />;
       case 'pallet':
@@ -55,9 +73,60 @@ export default function Dashboard() {
         return <UserManagement />;
       case 'sync':
         return <SyncQueue />;
+      case 'export':
+        return <ExportCounts />;
       default:
         return <StocktakeEntry />;
     }
+  }
+
+  function NavButton({
+    page,
+    label,
+    icon
+  }: {
+    page: Page;
+    label: string;
+    icon: ReactNode;
+  }) {
+    const isActive = currentPage === page;
+    return (
+      <button
+        onClick={() => setCurrentPage(page)}
+        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+          isActive ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-100'
+        }`}
+      >
+        {icon}
+        {label}
+      </button>
+    );
+  }
+
+  function MobileNavButton({
+    page,
+    label,
+    icon
+  }: {
+    page: Page;
+    label: string;
+    icon: ReactNode;
+  }) {
+    const isActive = currentPage === page;
+    return (
+      <button
+        onClick={() => {
+          setCurrentPage(page);
+          setMenuOpen(false);
+        }}
+        className={`w-full flex items-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${
+          isActive ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-100'
+        }`}
+      >
+        {icon}
+        {label}
+      </button>
+    );
   }
 
   return (
@@ -73,84 +142,28 @@ export default function Dashboard() {
             </div>
 
             <div className="hidden md:flex items-center gap-6">
-              <button
-                onClick={() => setCurrentPage('stocktake')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-                  currentPage === 'stocktake'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <Camera className="w-4 h-4" />
-                Stocktake
-              </button>
-
-              <button
-                onClick={() => setCurrentPage('sync')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-                  currentPage === 'sync'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <Upload className="w-4 h-4" />
-                Sync Queue
-              </button>
+              <NavButton page="stocktake" label="Stocktake" icon={<Camera className="w-4 h-4" />} />
+              <NavButton page="recounts" label="Recounts" icon={<ClipboardList className="w-4 h-4" />} />
+              <NavButton page="sync" label="Sync Queue" icon={<Upload className="w-4 h-4" />} />
 
               {canAccessPage('bulk') && (
-                <button
-                  onClick={() => setCurrentPage('bulk')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-                    currentPage === 'bulk'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  Bulk Upload
-                </button>
+                <NavButton page="bulk" label="Bulk Upload" icon={<FileSpreadsheet className="w-4 h-4" />} />
               )}
 
               {canAccessPage('pallet') && (
-                <button
-                  onClick={() => setCurrentPage('pallet')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-                    currentPage === 'pallet'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <Package className="w-4 h-4" />
-                  Pallet Config
-                </button>
+                <NavButton page="pallet" label="Pallet Config" icon={<Package className="w-4 h-4" />} />
               )}
 
               {canAccessPage('variance') && (
-                <button
-                  onClick={() => setCurrentPage('variance')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-                    currentPage === 'variance'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <FileText className="w-4 h-4" />
-                  Variance
-                </button>
+                <NavButton page="variance" label="Variance" icon={<FileText className="w-4 h-4" />} />
               )}
 
               {canAccessPage('users') && (
-                <button
-                  onClick={() => setCurrentPage('users')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-                    currentPage === 'users'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <Users className="w-4 h-4" />
-                  Users
-                </button>
+                <NavButton page="users" label="Users" icon={<Users className="w-4 h-4" />} />
+              )}
+
+              {canAccessPage('export') && (
+                <NavButton page="export" label="Export" icon={<Download className="w-4 h-4" />} />
               )}
 
               <div className="flex items-center gap-3 ml-4 pl-4 border-l border-gray-200">
@@ -180,102 +193,28 @@ export default function Dashboard() {
         {menuOpen && (
           <div className="md:hidden border-t border-gray-200 bg-white">
             <div className="px-4 py-3 space-y-2">
-              <button
-                onClick={() => {
-                  setCurrentPage('stocktake');
-                  setMenuOpen(false);
-                }}
-                className={`w-full flex items-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${
-                  currentPage === 'stocktake'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <Camera className="w-5 h-5" />
-                Stocktake
-              </button>
-
-              <button
-                onClick={() => {
-                  setCurrentPage('sync');
-                  setMenuOpen(false);
-                }}
-                className={`w-full flex items-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${
-                  currentPage === 'sync'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <Upload className="w-5 h-5" />
-                Sync Queue
-              </button>
+              <MobileNavButton page="stocktake" label="Stocktake" icon={<Camera className="w-5 h-5" />} />
+              <MobileNavButton page="recounts" label="Recounts" icon={<ClipboardList className="w-5 h-5" />} />
+              <MobileNavButton page="sync" label="Sync Queue" icon={<Upload className="w-5 h-5" />} />
 
               {canAccessPage('bulk') && (
-                <button
-                  onClick={() => {
-                    setCurrentPage('bulk');
-                    setMenuOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${
-                    currentPage === 'bulk'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <FileSpreadsheet className="w-5 h-5" />
-                  Bulk Upload
-                </button>
+                <MobileNavButton page="bulk" label="Bulk Upload" icon={<FileSpreadsheet className="w-5 h-5" />} />
               )}
 
               {canAccessPage('pallet') && (
-                <button
-                  onClick={() => {
-                    setCurrentPage('pallet');
-                    setMenuOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${
-                    currentPage === 'pallet'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <Package className="w-5 h-5" />
-                  Pallet Configuration
-                </button>
+                <MobileNavButton page="pallet" label="Pallet Config" icon={<Package className="w-5 h-5" />} />
               )}
 
               {canAccessPage('variance') && (
-                <button
-                  onClick={() => {
-                    setCurrentPage('variance');
-                    setMenuOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${
-                    currentPage === 'variance'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <FileText className="w-5 h-5" />
-                  Variance Reports
-                </button>
+                <MobileNavButton page="variance" label="Variance" icon={<FileText className="w-5 h-5" />} />
               )}
 
               {canAccessPage('users') && (
-                <button
-                  onClick={() => {
-                    setCurrentPage('users');
-                    setMenuOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${
-                    currentPage === 'users'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <Users className="w-5 h-5" />
-                  User Management
-                </button>
+                <MobileNavButton page="users" label="Users" icon={<Users className="w-5 h-5" />} />
+              )}
+
+              {canAccessPage('export') && (
+                <MobileNavButton page="export" label="Export" icon={<Download className="w-5 h-5" />} />
               )}
 
               <div className="pt-3 border-t border-gray-200">
@@ -296,9 +235,7 @@ export default function Dashboard() {
         )}
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {renderPage()}
-      </main>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{renderPage()}</main>
     </div>
   );
 }
