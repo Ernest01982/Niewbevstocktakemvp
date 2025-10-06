@@ -13,6 +13,7 @@ import {
   X
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useEventWarehouse } from '../contexts/EventWarehouseContext';
 import StocktakeEntry from './StocktakeEntry';
 import VarianceReports from './VarianceReports';
 import UserManagement from './UserManagement';
@@ -28,6 +29,14 @@ export default function Dashboard() {
   const { profile, signOut } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>('stocktake');
   const [menuOpen, setMenuOpen] = useState(false);
+  const {
+    events,
+    eventId,
+    setEventId,
+    warehouses,
+    warehouseCode,
+    setWarehouseCode
+  } = useEventWarehouse();
 
   async function handleSignOut() {
     try {
@@ -139,6 +148,36 @@ export default function Dashboard() {
                 <Camera className="w-8 h-8 text-blue-600" />
                 <h1 className="ml-2 text-xl font-bold text-gray-800">Smart Stocktake</h1>
               </div>
+              <div className="hidden md:flex items-center gap-3 ml-6">
+                <select
+                  value={eventId ?? ''}
+                  onChange={(event) => setEventId(event.target.value)}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                >
+                  <option value="" disabled>
+                    Select event
+                  </option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={warehouseCode ?? ''}
+                  onChange={(event) => setWarehouseCode(event.target.value)}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                >
+                  <option value="" disabled>
+                    Select warehouse
+                  </option>
+                  {warehouses.map((warehouse) => (
+                    <option key={warehouse.code} value={warehouse.code}>
+                      {warehouse.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="hidden md:flex items-center gap-6">
@@ -193,6 +232,42 @@ export default function Dashboard() {
         {menuOpen && (
           <div className="md:hidden border-t border-gray-200 bg-white">
             <div className="px-4 py-3 space-y-2">
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Event
+                  <select
+                    value={eventId ?? ''}
+                    onChange={(event) => setEventId(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  >
+                    <option value="" disabled>
+                      Select event
+                    </option>
+                    {events.map((event) => (
+                      <option key={event.id} value={event.id}>
+                        {event.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Warehouse
+                  <select
+                    value={warehouseCode ?? ''}
+                    onChange={(event) => setWarehouseCode(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  >
+                    <option value="" disabled>
+                      Select warehouse
+                    </option>
+                    {warehouses.map((warehouse) => (
+                      <option key={warehouse.code} value={warehouse.code}>
+                        {warehouse.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <MobileNavButton page="stocktake" label="Stocktake" icon={<Camera className="w-5 h-5" />} />
               <MobileNavButton page="recounts" label="Recounts" icon={<ClipboardList className="w-5 h-5" />} />
               <MobileNavButton page="sync" label="Sync Queue" icon={<Upload className="w-5 h-5" />} />

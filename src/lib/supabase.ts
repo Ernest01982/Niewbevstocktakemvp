@@ -21,8 +21,11 @@ export interface UserProfile {
 
 export interface Product {
   id: string;
+  stock_code?: string;
   product_name: string;
   barcode: string;
+  case_barcode?: string | null;
+  unit_barcode?: string | null;
   pack_size: string;
   expected_quantity: number;
   unit_type: 'pallet' | 'case' | 'layer';
@@ -35,6 +38,9 @@ export interface Product {
   available_stock: number;
   created_at: string;
   updated_at: string;
+  units_per_case?: number | null;
+  cases_per_layer?: number | null;
+  layers_per_pallet?: number | null;
 }
 
 export interface StocktakeEntry {

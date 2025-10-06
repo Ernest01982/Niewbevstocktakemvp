@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { EventWarehouseProvider } from './contexts/EventWarehouseContext';
 import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
@@ -33,7 +34,9 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <EventWarehouseProvider>
+        <AppContent />
+      </EventWarehouseProvider>
     </AuthProvider>
   );
 }
