@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   Camera,
   ClipboardList,
@@ -48,6 +48,14 @@ export default function Dashboard() {
     warehouseCode,
     setWarehouseCode
   } = useEventWarehouse();
+
+  useEffect(() => {
+    if (profile?.role === 'admin') {
+      setCurrentPage((previousPage) =>
+        previousPage === 'admin' ? previousPage : 'admin'
+      );
+    }
+  }, [profile?.role]);
 
   async function handleSignOut() {
     try {
