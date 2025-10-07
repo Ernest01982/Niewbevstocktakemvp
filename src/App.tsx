@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import { EventWarehouseProvider } from './contexts/EventWarehouseContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
@@ -34,11 +35,13 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <EventWarehouseProvider>
-        <AppContent />
-      </EventWarehouseProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <EventWarehouseProvider>
+          <AppContent />
+        </EventWarehouseProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

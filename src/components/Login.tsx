@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { LogIn, Eye, EyeOff, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { LogIn, Eye, EyeOff } from 'lucide-react';
+import { useTheme } from '../hooks/useTheme';
 
 interface LoginProps {
   onToggleRegister: () => void;
@@ -8,6 +9,7 @@ interface LoginProps {
 
 export default function Login({ onToggleRegister }: LoginProps) {
   const { signIn } = useAuth();
+  const { isDarkMode, toggleTheme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -29,26 +31,34 @@ export default function Login({ onToggleRegister }: LoginProps) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-4">
-      <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md">
+    <div className="relative min-h-screen flex items-center justify-center bg-slate-100 p-4 transition-colors duration-300 dark:bg-slate-950">
+      <button
+        type="button"
+        onClick={toggleTheme}
+        className="absolute top-6 right-6 flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm font-medium text-gray-700 shadow-lg backdrop-blur transition-colors hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-900 dark:focus-visible:ring-offset-slate-950"
+      >
+        {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        {isDarkMode ? 'Light mode' : 'Dark mode'}
+      </button>
+      <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-2xl transition-colors duration-300 dark:bg-slate-900 dark:shadow-slate-900/60">
         <div className="flex items-center justify-center mb-8">
-          <div className="bg-blue-600 p-3 rounded-full">
-            <LogIn className="w-8 h-8 text-white" />
+          <div className="rounded-full bg-blue-600 p-3">
+            <LogIn className="h-8 w-8 text-white" />
           </div>
         </div>
 
-        <h2 className="text-3xl font-bold text-center text-gray-800 mb-2">Welcome Back</h2>
-        <p className="text-center text-gray-600 mb-8">Sign in to your stocktake account</p>
+        <h2 className="mb-2 text-center text-3xl font-bold text-gray-800 dark:text-white">Welcome Back</h2>
+        <p className="mb-8 text-center text-gray-600 dark:text-slate-300">Sign in to your stocktake account</p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">
               {error}
             </div>
           )}
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="email" className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-200">
               Email Address
             </label>
             <input
@@ -57,13 +67,13 @@ export default function Login({ onToggleRegister }: LoginProps) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              className="w-full rounded-lg border border-gray-300 px-4 py-3 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-500/40"
               placeholder="you@company.com"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="password" className="mb-2 block text-sm font-medium text-gray-700 dark:text-slate-200">
               Password
             </label>
             <div className="relative">
@@ -73,19 +83,19 @@ export default function Login({ onToggleRegister }: LoginProps) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 pr-12 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-blue-400 dark:focus:ring-blue-500/40"
                 placeholder="Enter your password"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 transition-colors hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
                 tabIndex={-1}
               >
                 {showPassword ? (
-                  <EyeOff className="w-5 h-5" />
+                  <EyeOff className="h-5 w-5" />
                 ) : (
-                  <Eye className="w-5 h-5" />
+                  <Eye className="h-5 w-5" />
                 )}
               </button>
             </div>
@@ -94,7 +104,7 @@ export default function Login({ onToggleRegister }: LoginProps) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white transition-all hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-400 dark:focus-visible:ring-blue-500/40"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
@@ -103,7 +113,7 @@ export default function Login({ onToggleRegister }: LoginProps) {
         <div className="mt-6 text-center">
           <button
             onClick={onToggleRegister}
-            className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
+            className="text-sm font-medium text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
             Don't have an account? Register
           </button>
