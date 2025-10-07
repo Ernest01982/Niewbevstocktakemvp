@@ -17,6 +17,7 @@ export interface UserProfile {
   full_name: string;
   created_at: string;
   updated_at: string;
+  warehouses?: Array<{ code: string; name: string }>;
 }
 
 export interface Product {
