@@ -46,6 +46,22 @@ A full-stack warehouse stocktake application with camera input, AI-powered produ
 - Edit user roles
 - Delete users
 - View all system data
+- Access the Administrator Control Panel for operational oversight
+- Create stocktake events and register warehouses directly in-app
+
+### Administrator Control Panel
+
+The admin dashboard gives programme leads a live cockpit to govern every aspect of the deployment:
+
+- **Operational Snapshot** – At-a-glance metrics covering user population, warehouse coverage, active stocktake events, and the volume of unresolved variances.
+- **Variance Watchlist** – Highlights up to five outstanding variances that still need action so reconciliation efforts stay on track.
+- **Recent Activity Feed** – Streams the latest stocktake entries with user, quantity, and location context for quick auditing.
+- **Role Distribution Analytics** – Summarises how many stocktakers, managers, and admins exist to ensure proper coverage.
+- **Focus Controls** – Switch the globally selected event and warehouse to drive exports, reporting, and downstream experiences.
+- **Event Lifecycle Management** – Create new stocktake events, update their status (draft, active, paused, completed, archived), and mark the event currently in focus.
+- **Warehouse Registry** – Register additional sites without leaving the dashboard to keep assignment options current.
+
+Use the refresh action in the panel header to reload metrics, events, and warehouse lists after making changes.
 
 ## Tech Stack
 
@@ -355,6 +371,7 @@ The application uses a professional, warehouse-appropriate color palette designe
 src/
 ├── components/         # React components
 │   ├── Dashboard.tsx   # Main app layout with navigation
+│   ├── AdminDashboard.tsx # Admin-only control panel
 │   ├── Login.tsx       # Login form
 │   ├── Register.tsx    # Registration form
 │   ├── StocktakeEntry.tsx  # Photo capture and entry form

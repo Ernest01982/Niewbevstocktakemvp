@@ -131,10 +131,28 @@ export default function UserManagement() {
         }
 
         const data = (await response.json()) as Array<ManagedUser | { user_warehouse_assignments?: unknown }> | null;
-        const normalized = (data ?? []).map((user) => ({
-          ...user,
-          warehouses: normalizeWarehousesFromUser(user),
-        }));
+        const normalized = (data ?? []).reduce<ManagedUser[]>((accumulator, user) => {
+          if (!user || typeof user !== 'object') {
+            return accumulator;
+          }
+
+          const baseUser = user as Partial<ManagedUser>;
+
+          if (
+            typeof baseUser.id === 'string' &&
+            typeof baseUser.role === 'string' &&
+            typeof baseUser.full_name === 'string' &&
+            typeof baseUser.created_at === 'string' &&
+            typeof baseUser.updated_at === 'string'
+          ) {
+            accumulator.push({
+              ...(baseUser as ManagedUser),
+              warehouses: normalizeWarehousesFromUser(user)
+            });
+          }
+
+          return accumulator;
+        }, []);
         setUsers(normalized);
       } else {
         const { data, error } = await supabase
