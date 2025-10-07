@@ -63,7 +63,7 @@ function setStoredValue(key: string, value: string) {
 }
 
 export function EventWarehouseProvider({ children }: { children: ReactNode }) {
-  const { profile } = useAuth();
+  const { profile, user, loading: authLoading } = useAuth();
   const [events, setEvents] = useState<EventOption[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
   const [eventId, setEventIdState] = useState<string | undefined>(() => getStoredValue(EVENT_STORAGE_KEY));
@@ -74,6 +74,12 @@ export function EventWarehouseProvider({ children }: { children: ReactNode }) {
   const loading = eventsLoading || warehousesLoading;
 
   const fetchEvents = useCallback(async () => {
+    if (!user) {
+      setEvents([]);
+      setEventsLoading(false);
+      return;
+    }
+
     try {
       setEventsLoading(true);
       const { data, error } = await supabase
@@ -106,7 +112,7 @@ export function EventWarehouseProvider({ children }: { children: ReactNode }) {
     } finally {
       setEventsLoading(false);
     }
-  }, []);
+  }, [user]);
 
   const fetchWarehouses = useCallback(async () => {
     if (!profile) {
@@ -166,8 +172,13 @@ export function EventWarehouseProvider({ children }: { children: ReactNode }) {
   }, [profile]);
 
   useEffect(() => {
-    void fetchEvents();
-  }, [fetchEvents]);
+    if (!authLoading && user) {
+      void fetchEvents();
+    } else if (!authLoading && !user) {
+      setEvents([]);
+      setEventsLoading(false);
+    }
+  }, [authLoading, fetchEvents, user]);
 
   useEffect(() => {
     void fetchWarehouses();
