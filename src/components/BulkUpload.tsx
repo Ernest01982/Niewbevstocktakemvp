@@ -11,6 +11,7 @@ export default function BulkUpload() {
     total: number;
     success: number;
     failed: number;
+    skipped: number;
     errors: Array<{ row: number; error: string }>;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -75,7 +76,15 @@ export default function BulkUpload() {
 
       let successCount = 0;
       let failedCount = 0;
+      let skippedCount = 0;
       const errors: Array<{ row: number; error: string }> = [];
+
+      const { data: existingProducts, error: existingProductsError } = await supabase
+        .from('products')
+        .select('barcode');
+
+      if (existingProductsError) throw existingProductsError;
+      const existingBarcodes = new Set(existingProducts.map(p => p.barcode));
 
       for (let i = 0; i < rows.length; i++) {
         const values = rows[i];
@@ -84,9 +93,14 @@ export default function BulkUpload() {
         try {
           const product = parseProductRow(headers, values);
 
+          if (existingBarcodes.has(product.product_number)) {
+            skippedCount++;
+            continue;
+          }
+
           const { error: insertError } = await supabase
             .from('products')
-            .upsert({
+            .insert({
               barcode: product.product_number,
               product_name: product.product_description,
               lot: product.lot,
@@ -99,8 +113,6 @@ export default function BulkUpload() {
               pack_size: '',
               expected_quantity: product.stock_on_hand,
               unit_type: 'case' as const
-            }, {
-              onConflict: 'barcode'
             });
 
           if (insertError) throw insertError;
@@ -119,6 +131,7 @@ export default function BulkUpload() {
         .update({
           records_success: successCount,
           records_failed: failedCount,
+          skipped_rows: skippedCount,
           status: failedCount === 0 ? 'completed' : 'failed',
           error_log: errors
         })
@@ -128,6 +141,7 @@ export default function BulkUpload() {
         total: rows.length,
         success: successCount,
         failed: failedCount,
+        skipped: skippedCount,
         errors
       });
     } catch (error) {
@@ -297,7 +311,7 @@ export default function BulkUpload() {
                 <h3 className="font-semibold text-gray-800">Upload Complete</h3>
               </div>
 
-              <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="grid grid-cols-4 gap-4 text-center">
                 <div>
                   <p className="text-2xl font-bold text-gray-800">{result.total}</p>
                   <p className="text-sm text-gray-600">Total</p>
@@ -305,6 +319,10 @@ export default function BulkUpload() {
                 <div>
                   <p className="text-2xl font-bold text-green-600">{result.success}</p>
                   <p className="text-sm text-gray-600">Success</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-yellow-600">{result.skipped}</p>
+                  <p className="text-sm text-gray-600">Skipped</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-red-600">{result.failed}</p>

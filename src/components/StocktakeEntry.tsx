@@ -184,10 +184,6 @@ export default function StocktakeEntry({
       return;
     }
 
-    if (!photoFile) {
-      setErrorMessage('Capture a supporting photo before submitting.');
-      return;
-    }
 
     if (!hasQuantity) {
       setErrorMessage('Enter at least one quantity before submitting.');

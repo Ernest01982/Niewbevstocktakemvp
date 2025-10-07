@@ -137,6 +137,8 @@ function computeTotalUnits(
 }
 
 Deno.serve(async (req: Request) => {
+  console.log('submit-count function started');
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -172,6 +174,8 @@ Deno.serve(async (req: Request) => {
     const eventId = toTrimmedString(payload.event_id);
     const warehouseCode = toTrimmedString(payload.warehouse_code);
     const stockCode = toTrimmedString(payload.stock_code);
+
+    console.log(`Processing count for user ${user.id} in event ${eventId} and warehouse ${warehouseCode}`);
 
     if (!eventId) {
       throw new Error('event_id is required');
@@ -222,14 +226,26 @@ Deno.serve(async (req: Request) => {
       throw new Error('Event is not open for new counts');
     }
 
+    const caseBarcode = toTrimmedString(payload.case_barcode);
+    const unitBarcode = toTrimmedString(payload.unit_barcode);
+
+    const productIdentifier = stockCode ?? caseBarcode ?? unitBarcode;
+    if (!productIdentifier) {
+      throw new Error('One of stock_code, case_barcode, or unit_barcode is required');
+    }
+
     const { data: product, error: productError } = await supabase
       .from('products')
-      .select('stock_code, barcode, description, product_name, pack_size, units_per_case, cases_per_layer, layers_per_pallet')
-      .or(`stock_code.eq.${stockCode},barcode.eq.${stockCode}`)
+      .select(
+        'stock_code, description, units_per_case, cases_per_layer, layers_per_pallet',
+      )
+      .or(
+        `stock_code.eq.${productIdentifier},case_barcode.eq.${productIdentifier},unit_barcode.eq.${productIdentifier}`,
+      )
       .maybeSingle();
 
     if (productError || !product) {
-      throw new Error('Product not found for supplied stock_code');
+      throw new Error(`Product not found for identifier: ${productIdentifier}`);
     }
 
     const packaging: PackagingSnapshot = {
@@ -259,6 +275,8 @@ Deno.serve(async (req: Request) => {
       packaging,
     );
 
+    console.log(`Calculated total units: ${totalUnits}`);
+
     if (!Number.isFinite(totalUnits) || totalUnits < 0) {
       throw new Error('Calculated total units is invalid');
     }
@@ -268,7 +286,7 @@ Deno.serve(async (req: Request) => {
       const extension = photo.name.includes('.') ? photo.name.split('.').pop() : 'jpg';
       photoPath = `${eventId}/${warehouseCode}/${crypto.randomUUID()}.${extension}`;
       const { error: uploadError } = await supabase.storage
-        .from('count-images')
+        .from('count_images')
         .upload(photoPath, photo.data, {
           contentType: photo.contentType,
           cacheControl: '86400',
@@ -322,12 +340,15 @@ Deno.serve(async (req: Request) => {
       // Ignore refresh failures to keep submission fast
     }
 
-    return new Response(JSON.stringify({ ok: true, id: inserted.id, total_units: inserted.total_units }), {
+    console.log(`submit-count function finished successfully for count ${inserted.id}`);
+
+    return new Response(JSON.stringify({ ok: true, id: inserted.id, total_units: inserted.total_units, photo_path: photoPath }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('submit-count function failed:', message);
     return new Response(JSON.stringify({ ok: false, error: message }), {
       status: message === 'Unauthorized' ? 401 : 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

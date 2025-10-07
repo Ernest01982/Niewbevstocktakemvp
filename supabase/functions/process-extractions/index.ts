@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
 const corsHeaders: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': '*', 
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
@@ -26,7 +26,48 @@ function nonEmpty(value: string | null | undefined): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function parseOcrText(fullText: string): { barcode: string | null; lotNumber: string | null; productName: string | null } {
+  if (!fullText) {
+    return { barcode: null, lotNumber: null, productName: null };
+  }
+
+  const lines = fullText.split('\n').map(line => line.trim());
+
+  // Barcode extraction (ITF-14 or EAN-13)
+  const barcodeRegex = /\b(\d{13,14})\b/g;
+  let barcode: string | null = null;
+  for (const line of lines) {
+    const match = barcodeRegex.exec(line);
+    if (match) {
+      barcode = match[1];
+      break;
+    }
+  }
+
+  // Lot number extraction
+  const lotRegex = /(lot|l|batch)\s*:?\s*([a-z0-9\s-]+)/i;
+  let lotNumber: string | null = null;
+  for (const line of lines) {
+    const match = lotRegex.exec(line);
+    if (match && match[2]) {
+      lotNumber = match[2].trim();
+      break;
+    }
+  }
+
+  // Product name extraction (simple heuristic: assume the longest line is the product name)
+  let productName: string | null = null;
+  if (lines.length > 0) {
+    productName = lines.reduce((a, b) => a.length > b.length ? a : b);
+  }
+
+
+  return { barcode, lotNumber, productName };
+}
+
 Deno.serve(async (req: Request) => {
+  console.log('process-extractions function started');
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -55,58 +96,114 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Failed to load pending counts: ${pendingError.message}`);
     }
 
+    console.log(`Found ${pendingCounts?.length ?? 0} pending counts to process.`);
+
     const processed: string[] = [];
     const updatesFailed: string[] = [];
 
     for (const row of pendingCounts ?? []) {
-      const stockCode = row.stock_code as string;
-      const { data: product } = await supabase
-        .from('products')
-        .select('stock_code, barcode, description, product_name, pack_size')
-        .or(`stock_code.eq.${stockCode},barcode.eq.${stockCode}`)
-        .maybeSingle();
-
-      const extractedBarcode = nonEmpty(row.extracted_barcode) ?? nonEmpty(product?.barcode ?? null) ?? stockCode;
-      const extractedProductName = nonEmpty(row.extracted_product_name) ??
-        nonEmpty(row.product_description) ??
-        nonEmpty(product?.description ?? product?.product_name ?? null) ?? stockCode;
-      const extractedPackSize = nonEmpty(row.extracted_pack_size) ?? nonEmpty(product?.pack_size ?? null) ?? null;
-      const extractedLotNumber = nonEmpty(row.extracted_lot_number) ?? nonEmpty(row.lot_number ?? null) ?? null;
-
-      const updatePayload: Record<string, unknown> = {
-        status: 'extracted',
+      console.log(`Processing count ${row.id}`);
+      let extractionLog = [];
+      let updatePayload: Record<string, unknown> = {
+        status: 'processed',
         extracted_at: nowIso(),
-        extraction_log: [{
-          processed_at: nowIso(),
-          strategy: 'metadata-fill',
-          notes: 'Populated fields from product catalog snapshot (OCR not configured in this environment).',
-          product_match: product?.stock_code ?? product?.barcode ?? null,
-          photo_available: Boolean(row.photo_path),
-        }],
       };
 
-      if (!nonEmpty(row.extracted_barcode ?? null) && extractedBarcode) {
-        updatePayload.extracted_barcode = extractedBarcode;
-      }
-      if (!nonEmpty(row.extracted_product_name ?? null) && extractedProductName) {
-        updatePayload.extracted_product_name = extractedProductName;
-      }
-      if (!nonEmpty(row.extracted_pack_size ?? null) && extractedPackSize) {
-        updatePayload.extracted_pack_size = extractedPackSize;
-      }
-      if (!nonEmpty(row.extracted_lot_number ?? null) && extractedLotNumber) {
-        updatePayload.extracted_lot_number = extractedLotNumber;
-      }
+      try {
+        if (row.photo_path) {
+          console.log(`Downloading photo for count ${row.id}`);
+          const { data: photoData, error: downloadError } = await supabase.storage
+            .from('count_images')
+            .download(row.photo_path);
 
-      const { error: updateError } = await supabase
-        .from('counts')
-        .update(updatePayload)
-        .eq('id', row.id);
+          if (downloadError) {
+            throw new Error(`Failed to download photo: ${downloadError.message}`);
+          }
 
-      if (updateError) {
-        updatesFailed.push(row.id as string);
-      } else {
+          const imageBytes = new Uint8Array(await photoData.arrayBuffer());
+          const imageBase64 = btoa(String.fromCharCode.apply(null, imageBytes));
+
+          console.log(`Calling Vision API for count ${row.id}`);
+          const visionApiUrl = `https://vision.googleapis.com/v1/images:annotate?key=${getEnv('VISION_API_KEY')}`;
+          const visionApiResponse = await fetch(visionApiUrl, {
+            method: 'POST',
+            body: JSON.stringify({
+              requests: [
+                {
+                  image: {
+                    content: imageBase64,
+                  },
+                  features: [
+                    {
+                      type: 'TEXT_DETECTION',
+                      maxResults: 1,
+                    },
+                  ],
+                },
+              ],
+            }),
+          });
+
+          if (!visionApiResponse.ok) {
+            throw new Error(`Vision API request failed: ${visionApiResponse.statusText}`);
+          }
+
+          const visionApiData = await visionApiResponse.json();
+          const fullText = visionApiData.responses[0]?.fullTextAnnotation?.text;
+          console.log(`OCR outcome for count ${row.id}: ${fullText ? 'Success' : 'Failure'}`);
+
+          const { barcode, lotNumber, productName } = parseOcrText(fullText);
+
+          extractionLog.push({
+            processed_at: nowIso(),
+            strategy: 'ocr',
+            notes: 'Processed with Google Cloud Vision API.',
+            fullText: fullText,
+            parsed: { barcode, lotNumber, productName },
+          });
+
+          updatePayload.extraction_log = extractionLog;
+          updatePayload.extracted_barcode = barcode;
+          updatePayload.extracted_lot_number = lotNumber;
+          updatePayload.extracted_product_name = productName;
+
+        } else {
+          console.log(`No photo for count ${row.id}, skipping OCR.`);
+          extractionLog.push({
+            processed_at: nowIso(),
+            strategy: 'no-photo',
+            notes: 'No photo provided for this count.',
+          });
+          updatePayload.extraction_log = extractionLog;
+        }
+
+        const { error: updateError } = await supabase
+          .from('counts')
+          .update(updatePayload)
+          .eq('id', row.id);
+
+        if (updateError) {
+          throw new Error(`Failed to update count: ${updateError.message}`);
+        }
+
         processed.push(row.id as string);
+      } catch (e) {
+        updatesFailed.push(row.id as string);
+        console.error(`Failed to process count ${row.id}:`, e.message);
+        const { error: updateError } = await supabase
+          .from('counts')
+          .update({
+            status: 'failed',
+            extraction_log: [
+              ...extractionLog,
+              {
+                processed_at: nowIso(),
+                strategy: 'error',
+                notes: e.message,
+              },
+            ],
+          })
+          .eq('id', row.id);
       }
     }
 
@@ -123,14 +220,18 @@ Deno.serve(async (req: Request) => {
     }
 
     const purged: string[] = [];
-    for (const record of stalePhotos ?? []) {
-      const path = record.photo_path as string | null;
-      if (!path) continue;
-      const { error: removeError } = await supabase.storage.from('count-images').remove([path]);
-      if (!removeError) {
-        await supabase.from('counts').update({ photo_path: null }).eq('id', record.id);
-        purged.push(record.id as string);
+    if (stalePhotos && stalePhotos.length > 0) {
+      console.log(`Found ${stalePhotos.length} stale photos to purge.`);
+      for (const record of stalePhotos) {
+        const path = record.photo_path as string | null;
+        if (!path) continue;
+        const { error: removeError } = await supabase.storage.from('count_images').remove([path]);
+        if (!removeError) {
+          await supabase.from('counts').update({ photo_path: null }).eq('id', record.id);
+          purged.push(record.id as string);
+        }
       }
+      console.log(`Purged ${purged.length} photos.`);
     }
 
     try {
@@ -139,12 +240,12 @@ Deno.serve(async (req: Request) => {
       // Ignore refresh issues to keep worker resilient
     }
 
+    console.log(`process-extractions function finished successfully. Processed: ${processed.length}, Failed: ${updatesFailed.length}, Purged: ${purged.length}`);
+
     return new Response(
       JSON.stringify({
-        ok: true,
-        processed_count: processed.length,
-        failed: updatesFailed,
-        purged_count: purged.length,
+        processed: processed.length,
+        purged: purged.length,
       }),
       {
         status: 200,
@@ -153,6 +254,7 @@ Deno.serve(async (req: Request) => {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('process-extractions function failed:', message);
     return new Response(JSON.stringify({ ok: false, error: message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

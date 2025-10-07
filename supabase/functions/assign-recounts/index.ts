@@ -65,7 +65,10 @@ Deno.serve(async (req: Request) => {
       throw new Error('warehouse_code is required');
     }
     if (items.length === 0) {
-      throw new Error('At least one item is required');
+      return new Response(JSON.stringify({ ok: true, created: 0 }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const supabase = createClient(getEnv('SB_URL'), getEnv('SB_SERVICE_ROLE_KEY'));
@@ -147,6 +150,18 @@ Deno.serve(async (req: Request) => {
       throw new Error('No stock takers are assigned to this warehouse');
     }
 
+    const { data: existingTasks, error: existingTasksError } = await supabase
+      .from('recount_tasks')
+      .select('stock_code, lot_number')
+      .eq('event_id', eventId)
+      .eq('warehouse_code', warehouseCode);
+
+    if (existingTasksError) {
+      throw new Error(`Failed to load existing recount tasks: ${existingTasksError.message}`);
+    }
+    const existingTaskKeys = new Set(existingTasks.map(t => `${t.stock_code}:${t.lot_number}`));
+
+
     const { data: lastTask } = await supabase
       .from('recount_tasks')
       .select('assigned_to')
@@ -158,13 +173,26 @@ Deno.serve(async (req: Request) => {
 
     const startIndex = rotateStartIndex(eligible, lastTask?.assigned_to ?? null);
     const assignments: { index: number; userId: string }[] = [];
-    for (let i = 0; i < items.length; i += 1) {
+    const newItems = items.filter(item => {
+        const stockCode = toTrimmed(item?.stock_code);
+        const lotNumber = toTrimmed(item?.lot_number);
+        return !existingTaskKeys.has(`${stockCode}:${lotNumber}`);
+    });
+
+    for (let i = 0; i < newItems.length; i += 1) {
       const userIdForTask = eligible[(startIndex + i) % eligible.length];
       assignments.push({ index: i, userId: userIdForTask });
     }
 
+    if (assignments.length === 0) {
+        return new Response(JSON.stringify({ ok: true, created: 0 }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+    }
+
     const rowsToInsert = assignments.map(({ index, userId: assignedTo }) => {
-      const item = items[index];
+      const item = newItems[index];
       const stockCode = toTrimmed(item?.stock_code);
       if (!stockCode) {
         throw new Error(`Item at position ${index} is missing stock_code`);
@@ -185,13 +213,13 @@ Deno.serve(async (req: Request) => {
     const { data: inserted, error: insertError } = await supabase
       .from('recount_tasks')
       .insert(rowsToInsert)
-      .select('id, stock_code, lot_number, assigned_to, status');
+      .select('id');
 
     if (insertError) {
       throw new Error(`Failed to create tasks: ${insertError.message}`);
     }
 
-    return new Response(JSON.stringify({ ok: true, tasks: inserted ?? [] }), {
+    return new Response(JSON.stringify({ ok: true, created: inserted.length }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

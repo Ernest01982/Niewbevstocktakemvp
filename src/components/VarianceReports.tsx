@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertCircle, ClipboardList, Loader2, RefreshCcw } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ClipboardList, Loader2, RefreshCcw } from 'lucide-react';
 import { useEventWarehouse } from '../contexts/EventWarehouseContext';
 import { useVariance } from '../hooks/useVariance';
 import { useAssignRecounts } from '../hooks/useAssignRecounts';
@@ -98,8 +98,20 @@ export default function VarianceReports() {
             <Loader2 className="h-8 w-8 animate-spin text-blue-600" /> Loading variance data…
           </div>
         ) : rows.length === 0 ? (
-          <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-600">
-            No variances to show for this selection.
+          <div className="bg-white rounded-xl shadow-lg p-8 text-center space-y-3">
+            <CheckCircle2 className="mx-auto h-10 w-10 text-green-500" />
+            <h3 className="text-lg font-semibold text-gray-800">No variances to report</h3>
+            <p className="text-gray-600 text-sm">
+              All counts match the expected quantities for the selected event and warehouse.
+            </p>
+            <button
+              type="button"
+              onClick={() => varianceQuery.refetch()}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-50"
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Refresh
+            </button>
           </div>
         ) : (
           <div className="overflow-hidden rounded-lg border border-gray-200">
