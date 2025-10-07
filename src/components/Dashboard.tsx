@@ -51,9 +51,10 @@ export default function Dashboard() {
 
     switch (page) {
       case 'stocktake':
+        return true;
       case 'recounts':
       case 'sync':
-        return true;
+        return profile.role !== 'stocktaker';
       case 'bulk':
       case 'variance':
       case 'pallet':
@@ -67,6 +68,10 @@ export default function Dashboard() {
   }
 
   function renderPage() {
+    if (!canAccessPage(currentPage)) {
+      return <StocktakeEntry />;
+    }
+
     switch (currentPage) {
       case 'stocktake':
         return <StocktakeEntry />;
@@ -182,8 +187,12 @@ export default function Dashboard() {
 
             <div className="hidden md:flex items-center gap-6">
               <NavButton page="stocktake" label="Stocktake" icon={<Camera className="w-4 h-4" />} />
-              <NavButton page="recounts" label="Recounts" icon={<ClipboardList className="w-4 h-4" />} />
-              <NavButton page="sync" label="Sync Queue" icon={<Upload className="w-4 h-4" />} />
+              {canAccessPage('recounts') && (
+                <NavButton page="recounts" label="Recounts" icon={<ClipboardList className="w-4 h-4" />} />
+              )}
+              {canAccessPage('sync') && (
+                <NavButton page="sync" label="Sync Queue" icon={<Upload className="w-4 h-4" />} />
+              )}
 
               {canAccessPage('bulk') && (
                 <NavButton page="bulk" label="Bulk Upload" icon={<FileSpreadsheet className="w-4 h-4" />} />
@@ -269,8 +278,12 @@ export default function Dashboard() {
                 </label>
               </div>
               <MobileNavButton page="stocktake" label="Stocktake" icon={<Camera className="w-5 h-5" />} />
-              <MobileNavButton page="recounts" label="Recounts" icon={<ClipboardList className="w-5 h-5" />} />
-              <MobileNavButton page="sync" label="Sync Queue" icon={<Upload className="w-5 h-5" />} />
+              {canAccessPage('recounts') && (
+                <MobileNavButton page="recounts" label="Recounts" icon={<ClipboardList className="w-5 h-5" />} />
+              )}
+              {canAccessPage('sync') && (
+                <MobileNavButton page="sync" label="Sync Queue" icon={<Upload className="w-5 h-5" />} />
+              )}
 
               {canAccessPage('bulk') && (
                 <MobileNavButton page="bulk" label="Bulk Upload" icon={<FileSpreadsheet className="w-5 h-5" />} />
