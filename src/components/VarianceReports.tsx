@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle2, ClipboardList, Loader2, RefreshCcw } from 'lucide-react';
-import { useEventWarehouse } from '../contexts/EventWarehouseContext';
+import { useEventWarehouse } from '../hooks/useEventWarehouse';
 import { useVariance } from '../hooks/useVariance';
 import { useAssignRecounts } from '../hooks/useAssignRecounts';
 

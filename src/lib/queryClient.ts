@@ -1,4 +1,4 @@
-import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, createElement, type PropsWithChildren, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 type QueryKey = unknown[] | readonly unknown[] | string;
 
@@ -99,7 +99,7 @@ export class QueryClient {
 const QueryClientContext = createContext<QueryClient | null>(null);
 
 export function QueryClientProvider({ client, children }: PropsWithChildren<{ client: QueryClient }>) {
-  return <QueryClientContext.Provider value={client}>{children}</QueryClientContext.Provider>;
+  return createElement(QueryClientContext.Provider, { value: client }, children);
 }
 
 export function useQueryClient() {
@@ -192,3 +192,4 @@ export function useMutation<TData, TVariables>({ mutationFn, onSuccess, onError 
     isPending
   };
 }
+

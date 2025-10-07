@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle2, Info, Loader2 } from 'lucide-react';
-import PhotoCapture, { type RoiCropResult } from './PhotoCapture';
-import { useEventWarehouse } from '../contexts/EventWarehouseContext';
+import PhotoCapture from './PhotoCapture';
+import type { RoiCropResult } from './photoCaptureTypes';
+import { useEventWarehouse } from '../hooks/useEventWarehouse';
 import { useProductsLookup } from '../hooks/useProductsLookup';
 import { useSubmitCount, type SubmitCountPayload } from '../hooks/useSubmitCount';
 import { unitsBulk, unitsPickface, unitsSingles } from '../utils/packaging';

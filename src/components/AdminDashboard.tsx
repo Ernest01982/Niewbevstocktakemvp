@@ -13,8 +13,8 @@ import {
   ShieldCheck,
   Users
 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { useEventWarehouse } from '../contexts/EventWarehouseContext';
+import { useAuth } from '../hooks/useAuth';
+import { useEventWarehouse } from '../hooks/useEventWarehouse';
 import { supabase } from '../lib/supabase';
 
 type EventStatus = 'draft' | 'active' | 'paused' | 'completed' | 'archived';

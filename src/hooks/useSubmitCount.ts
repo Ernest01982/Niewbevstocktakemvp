@@ -1,6 +1,6 @@
 import { useMutation } from '../lib/queryClient';
 import { useSupabaseClientWithAuth } from './useSupabaseClientWithAuth';
-import type { RoiCropResult } from '../components/PhotoCapture';
+import type { RoiCropResult } from '../components/photoCaptureTypes';
 
 export interface SubmitCountPayload {
   eventId: string;
