@@ -1,0 +1,5 @@
+[functions."process-extractions"]
+verify_jwt = false
+
+[functions."process-extractions".cron]
+schedule = "*/10 * * * *"
