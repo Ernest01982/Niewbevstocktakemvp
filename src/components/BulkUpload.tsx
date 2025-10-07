@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Download } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { supabase, ProductImportRow } from '../lib/supabase';
 import { loadXLSX } from '../lib/xlsxLoader';
 

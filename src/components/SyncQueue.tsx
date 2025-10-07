@@ -8,7 +8,7 @@ import {
   QueuedEntry
 } from '../lib/syncQueue';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 export default function SyncQueue() {
   const { user } = useAuth();

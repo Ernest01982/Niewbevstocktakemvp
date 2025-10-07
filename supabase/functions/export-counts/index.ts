@@ -99,7 +99,7 @@ Deno.serve(async (req: Request) => {
 
     try {
       await supabase.rpc('refresh_counts_totals_mv');
-    } catch (_refreshError) {
+    } catch {
       // Non-blocking
     }
 

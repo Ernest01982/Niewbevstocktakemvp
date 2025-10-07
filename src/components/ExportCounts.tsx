@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
-import { useEventWarehouse } from '../contexts/EventWarehouseContext';
+import { useEventWarehouse } from '../hooks/useEventWarehouse';
 import { useExportCounts } from '../hooks/useExportCounts';
 
 export default function ExportCounts() {

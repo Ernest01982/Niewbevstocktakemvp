@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Users, CreditCard as Edit, Trash2, UserPlus, Shield, Eye, EyeOff } from 'lucide-react';
 import { supabase, UserProfile } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 interface WarehouseSummary {
   code: string;

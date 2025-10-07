@@ -13,8 +13,8 @@ import {
   Users,
   X
 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { useEventWarehouse } from '../contexts/EventWarehouseContext';
+import { useAuth } from '../hooks/useAuth';
+import { useEventWarehouse } from '../hooks/useEventWarehouse';
 import StocktakeEntry from './StocktakeEntry';
 import VarianceReports from './VarianceReports';
 import UserManagement from './UserManagement';

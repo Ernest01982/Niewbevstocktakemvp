@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { UserRole } from '../lib/supabase';
 
 interface ProtectedRouteProps {

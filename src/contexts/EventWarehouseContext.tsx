@@ -2,13 +2,12 @@ import {
   createContext,
   type ReactNode,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState
 } from 'react';
 import { supabase } from '../lib/supabase';
-import { useAuth } from './AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 const EVENT_STORAGE_KEY = 'nb-stocktake:selected-event';
 const WAREHOUSE_STORAGE_KEY = 'nb-stocktake:selected-warehouse';
@@ -41,7 +40,7 @@ interface EventWarehouseContextValue {
   refreshWarehouses: () => Promise<void>;
 }
 
-const EventWarehouseContext = createContext<EventWarehouseContextValue | undefined>(undefined);
+export const EventWarehouseContext = createContext<EventWarehouseContextValue | undefined>(undefined);
 
 function getStoredValue(key: string) {
   if (typeof window === 'undefined') return undefined;
@@ -232,10 +231,3 @@ export function EventWarehouseProvider({ children }: { children: ReactNode }) {
   return <EventWarehouseContext.Provider value={value}>{children}</EventWarehouseContext.Provider>;
 }
 
-export function useEventWarehouse() {
-  const context = useContext(EventWarehouseContext);
-  if (!context) {
-    throw new Error('useEventWarehouse must be used within an EventWarehouseProvider');
-  }
-  return context;
-}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ClipboardList, Loader2, RefreshCcw, Search } from 'lucide-react';
 import StocktakeEntry from './StocktakeEntry';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 interface RecountTask {
   id: string;

@@ -20,12 +20,6 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function nonEmpty(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
 function parseOcrText(fullText: string): { barcode: string | null; lotNumber: string | null; productName: string | null } {
   if (!fullText) {
     return { barcode: null, lotNumber: null, productName: null };
@@ -103,8 +97,8 @@ Deno.serve(async (req: Request) => {
 
     for (const row of pendingCounts ?? []) {
       console.log(`Processing count ${row.id}`);
-      let extractionLog = [];
-      let updatePayload: Record<string, unknown> = {
+      const extractionLog = [];
+      const updatePayload: Record<string, unknown> = {
         status: 'processed',
         extracted_at: nowIso(),
       };
@@ -204,6 +198,10 @@ Deno.serve(async (req: Request) => {
             ],
           })
           .eq('id', row.id);
+
+        if (updateError) {
+          console.error(`Failed to mark count ${row.id} as failed:`, updateError.message);
+        }
       }
     }
 
@@ -236,7 +234,7 @@ Deno.serve(async (req: Request) => {
 
     try {
       await supabase.rpc('refresh_counts_totals_mv');
-    } catch (_refreshError) {
+    } catch {
       // Ignore refresh issues to keep worker resilient
     }
 
@@ -261,3 +259,4 @@ Deno.serve(async (req: Request) => {
     });
   }
 });
+
