@@ -1,3 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-100 text-slate-900 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100;
+  }
+
+  select,
+  input,
+  textarea {
+    @apply transition-colors duration-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100;
+  }
+}
