@@ -7,8 +7,8 @@ This document provides instructions for setting up, running, and testing the Nei
 Create a `.env` file in the `frontend` directory with the following content:
 
 ```
-VITE_SUPABASE_URL=https://osekmgnqymeadecziuwv.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZWttZ25xeW1lYWRlY3ppdXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2Nzc3ODUsImV4cCI6MjA3NTI1Mzc4NX0.xJOXMPvA_lNWHJUFQkd1VtjABp_YTYpvu-3_nFsQoLA
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
 ```
 
 ## Running the Application
