@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '../lib/queryClient';
-import { supabase } from '../lib/supabase';
+import { supabase, type Product } from '../lib/supabase';
 
 export interface ProductLookupInput {
   stockCode?: string;
@@ -17,7 +17,7 @@ export function useProductsLookup(input: ProductLookupInput) {
     };
   }, [input.caseBarcode, input.stockCode, input.unitBarcode]);
 
-  return useQuery({
+  return useQuery<Product | null>({
     queryKey: ['product-lookup', normalised.stockCode, normalised.caseBarcode, normalised.unitBarcode],
     enabled: Boolean(normalised.stockCode || normalised.caseBarcode || normalised.unitBarcode),
     queryFn: async () => {
@@ -34,9 +34,9 @@ export function useProductsLookup(input: ProductLookupInput) {
         query = query.eq('unit_barcode', normalised.unitBarcode);
       }
 
-      const { data, error } = await query.maybeSingle();
+      const { data, error } = await query.maybeSingle<Product>();
       if (error) throw error;
-      return data;
+      return data ?? null;
     }
   });
 }

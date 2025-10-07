@@ -3,7 +3,7 @@ import { AlertCircle, CheckCircle2, Info, Loader2 } from 'lucide-react';
 import PhotoCapture, { type RoiCropResult } from './PhotoCapture';
 import { useEventWarehouse } from '../contexts/EventWarehouseContext';
 import { useProductsLookup } from '../hooks/useProductsLookup';
-import { useSubmitCount } from '../hooks/useSubmitCount';
+import { useSubmitCount, type SubmitCountPayload } from '../hooks/useSubmitCount';
 import { unitsBulk, unitsPickface, unitsSingles } from '../utils/packaging';
 
 export type CountMode = 'singles' | 'pickface' | 'bulk';
@@ -70,14 +70,14 @@ export default function StocktakeEntry({
   }, [initialLotNumber]);
 
   const productQuery = useProductsLookup({ stockCode, caseBarcode, unitBarcode });
-  const product = productQuery.data as any;
+  const product = productQuery.data;
 
   const packaging = useMemo(() => {
     return {
       upc: typeof product?.units_per_case === 'number' ? product.units_per_case : undefined,
       cpl: typeof product?.cases_per_layer === 'number' ? product.cases_per_layer : undefined,
       lpp: typeof product?.layers_per_pallet === 'number' ? product.layers_per_pallet : undefined,
-      description: product?.product_name ?? product?.description ?? ''
+      description: product?.product_name ?? ''
     };
   }, [product]);
 
@@ -195,7 +195,7 @@ export default function StocktakeEntry({
     }
 
     try {
-      const payload = {
+      const payload: SubmitCountPayload = {
         eventId,
         warehouseCode,
         stockCode: stockCode || undefined,
@@ -205,22 +205,20 @@ export default function StocktakeEntry({
         photo: photoFile,
         roiCrops: photoCrops,
         recountTaskId
-      } as const;
-
-      const numericPayload = { ...payload } as any;
+      };
       if (activeTab === 'singles') {
-        numericPayload.singlesUnits = singlesUnitsValue;
-        numericPayload.singlesCases = singlesCasesValue;
+        payload.singlesUnits = singlesUnitsValue;
+        payload.singlesCases = singlesCasesValue;
       } else if (activeTab === 'pickface') {
-        numericPayload.pickfaceLayers = pickfaceLayersValue;
-        numericPayload.pickfaceCases = pickfaceCasesValue;
+        payload.pickfaceLayers = pickfaceLayersValue;
+        payload.pickfaceCases = pickfaceCasesValue;
       } else {
-        numericPayload.bulkPallets = bulkPalletsValue;
-        numericPayload.bulkLayers = bulkLayersValue;
-        numericPayload.bulkCases = bulkCasesValue;
+        payload.bulkPallets = bulkPalletsValue;
+        payload.bulkLayers = bulkLayersValue;
+        payload.bulkCases = bulkCasesValue;
       }
 
-      await submitCount.mutateAsync(numericPayload);
+      await submitCount.mutateAsync(payload);
 
       setSuccessMessage('Captured ✓ — processing in background');
       handleResetAfterSubmit();

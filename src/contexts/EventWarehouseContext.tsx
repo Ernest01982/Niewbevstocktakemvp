@@ -1,4 +1,12 @@
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState
+} from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
@@ -29,6 +37,8 @@ interface EventWarehouseContextValue {
   setWarehouseCode: (value: string) => void;
   selectedEvent?: EventOption;
   selectedWarehouse?: WarehouseOption;
+  refreshEvents: () => Promise<void>;
+  refreshWarehouses: () => Promise<void>;
 }
 
 const EventWarehouseContext = createContext<EventWarehouseContextValue | undefined>(undefined);
@@ -58,100 +68,120 @@ export function EventWarehouseProvider({ children }: { children: ReactNode }) {
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
   const [eventId, setEventIdState] = useState<string | undefined>(() => getStoredValue(EVENT_STORAGE_KEY));
   const [warehouseCode, setWarehouseCodeState] = useState<string | undefined>(() => getStoredValue(WAREHOUSE_STORAGE_KEY));
-  const [loading, setLoading] = useState(true);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [warehousesLoading, setWarehousesLoading] = useState(true);
 
-  useEffect(() => {
-    async function loadEvents() {
-      try {
-        const { data, error } = await supabase
-          .from('stocktake_events')
-          .select('id, name, status, starts_at, ends_at')
-          .order('starts_at', { ascending: false });
+  const loading = eventsLoading || warehousesLoading;
 
-        if (error) throw error;
-        const mapped = (data ?? []).map((row) => ({
-          id: row.id as string,
-          name: (row.name as string) ?? 'Unnamed event',
-          status: (row.status as string | null) ?? null,
-          starts_at: (row.starts_at as string | null) ?? null,
-          ends_at: (row.ends_at as string | null) ?? null
-        }));
-        setEvents(mapped);
-        if (mapped.length > 0 && !eventId) {
-          setEventIdState(mapped[0].id);
+  const fetchEvents = useCallback(async () => {
+    try {
+      setEventsLoading(true);
+      const { data, error } = await supabase
+        .from('stocktake_events')
+        .select('id, name, status, starts_at, ends_at')
+        .order('starts_at', { ascending: false });
+
+      if (error) throw error;
+      const mapped = (data ?? []).map((row) => ({
+        id: row.id as string,
+        name: (row.name as string) ?? 'Unnamed event',
+        status: (row.status as string | null) ?? null,
+        starts_at: (row.starts_at as string | null) ?? null,
+        ends_at: (row.ends_at as string | null) ?? null
+      }));
+      setEvents(mapped);
+      setEventIdState((current) => {
+        if (current || mapped.length === 0) {
+          return current;
         }
-      } catch (error) {
-        console.error('Failed to load events', error);
-        setEvents([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadEvents();
-  }, [eventId]);
-
-  useEffect(() => {
-    async function loadWarehouses() {
-      if (!profile) {
-        setWarehouses([]);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from('warehouses')
-          .select('id, code, name')
-          .order('name', { ascending: true });
-
-        if (error) throw error;
-        let mapped = (data ?? []).map((row) => ({
-          id: row.id as string,
-          code: (row.code as string) ?? row.id,
-          name: (row.name as string) ?? row.code ?? row.id
-        }));
-
-        if (profile.role === 'stocktaker') {
-          const { data: assignments, error: assignmentError } = await supabase
-            .from('user_warehouse_assignments')
-            .select('warehouse_code')
-            .eq('user_id', profile.id);
-
-          if (assignmentError) throw assignmentError;
-          const assignedCodes = new Set(
-            (assignments ?? [])
-              .map((assignment) => assignment.warehouse_code as string | undefined)
-              .filter((code): code is string => Boolean(code))
-          );
-          if (assignedCodes.size > 0) {
-            mapped = mapped.filter((warehouse) => assignedCodes.has(warehouse.code));
-          }
+        const defaultId = mapped[0]?.id;
+        if (defaultId) {
+          setStoredValue(EVENT_STORAGE_KEY, defaultId);
         }
+        return defaultId ?? current;
+      });
+    } catch (error) {
+      console.error('Failed to load events', error);
+      setEvents([]);
+    } finally {
+      setEventsLoading(false);
+    }
+  }, []);
 
-        setWarehouses(mapped);
-        if (mapped.length > 0 && !warehouseCode) {
-          setWarehouseCodeState(mapped[0].code);
+  const fetchWarehouses = useCallback(async () => {
+    if (!profile) {
+      setWarehouses([]);
+      setWarehousesLoading(false);
+      return;
+    }
+
+    try {
+      setWarehousesLoading(true);
+      const { data, error } = await supabase
+        .from('warehouses')
+        .select('id, code, name')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      let mapped = (data ?? []).map((row) => ({
+        id: row.id as string,
+        code: (row.code as string) ?? row.id,
+        name: (row.name as string) ?? row.code ?? row.id
+      }));
+
+      if (profile.role === 'stocktaker') {
+        const { data: assignments, error: assignmentError } = await supabase
+          .from('user_warehouse_assignments')
+          .select('warehouse_code')
+          .eq('user_id', profile.id);
+
+        if (assignmentError) throw assignmentError;
+        const assignedCodes = new Set(
+          (assignments ?? [])
+            .map((assignment) => assignment.warehouse_code as string | undefined)
+            .filter((code): code is string => Boolean(code))
+        );
+        if (assignedCodes.size > 0) {
+          mapped = mapped.filter((warehouse) => assignedCodes.has(warehouse.code));
         }
-      } catch (error) {
-        console.error('Failed to load warehouses', error);
-        setWarehouses([]);
       }
-    }
 
-    loadWarehouses();
-  }, [profile, warehouseCode]);
+      setWarehouses(mapped);
+      setWarehouseCodeState((current) => {
+        if (current || mapped.length === 0) {
+          return current;
+        }
+        const defaultCode = mapped[0]?.code;
+        if (defaultCode) {
+          setStoredValue(WAREHOUSE_STORAGE_KEY, defaultCode);
+        }
+        return defaultCode ?? current;
+      });
+    } catch (error) {
+      console.error('Failed to load warehouses', error);
+      setWarehouses([]);
+    } finally {
+      setWarehousesLoading(false);
+    }
+  }, [profile]);
 
   useEffect(() => {
-    if (eventId) {
-      setStoredValue(EVENT_STORAGE_KEY, eventId);
-    }
-  }, [eventId]);
+    void fetchEvents();
+  }, [fetchEvents]);
 
   useEffect(() => {
-    if (warehouseCode) {
-      setStoredValue(WAREHOUSE_STORAGE_KEY, warehouseCode);
-    }
-  }, [warehouseCode]);
+    void fetchWarehouses();
+  }, [fetchWarehouses]);
+
+  const updateEventId = useCallback((value: string) => {
+    setEventIdState(value);
+    setStoredValue(EVENT_STORAGE_KEY, value);
+  }, []);
+
+  const updateWarehouseCode = useCallback((value: string) => {
+    setWarehouseCodeState(value);
+    setStoredValue(WAREHOUSE_STORAGE_KEY, value);
+  }, []);
 
   const selectedEvent = useMemo(() => events.find((event) => event.id === eventId), [events, eventId]);
   const selectedWarehouse = useMemo(
@@ -168,10 +198,24 @@ export function EventWarehouseProvider({ children }: { children: ReactNode }) {
       loading,
       selectedEvent,
       selectedWarehouse,
-      setEventId: setEventIdState,
-      setWarehouseCode: setWarehouseCodeState
+      setEventId: updateEventId,
+      setWarehouseCode: updateWarehouseCode,
+      refreshEvents: fetchEvents,
+      refreshWarehouses: fetchWarehouses
     }),
-    [eventId, events, loading, selectedEvent, selectedWarehouse, warehouseCode, warehouses]
+    [
+      eventId,
+      events,
+      fetchEvents,
+      fetchWarehouses,
+      loading,
+      selectedEvent,
+      selectedWarehouse,
+      updateEventId,
+      updateWarehouseCode,
+      warehouseCode,
+      warehouses
+    ]
   );
 
   return <EventWarehouseContext.Provider value={value}>{children}</EventWarehouseContext.Provider>;

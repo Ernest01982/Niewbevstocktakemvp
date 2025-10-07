@@ -8,6 +8,7 @@ import {
   LogOut,
   Menu,
   Package,
+  Settings,
   Upload,
   Users,
   X
@@ -22,8 +23,18 @@ import BulkUpload from './BulkUpload';
 import PalletConfiguration from './PalletConfiguration';
 import Recounts from './Recounts';
 import ExportCounts from './ExportCounts';
+import AdminDashboard from './AdminDashboard';
 
-type Page = 'stocktake' | 'recounts' | 'variance' | 'users' | 'sync' | 'bulk' | 'pallet' | 'export';
+type Page =
+  | 'stocktake'
+  | 'recounts'
+  | 'variance'
+  | 'users'
+  | 'sync'
+  | 'bulk'
+  | 'pallet'
+  | 'export'
+  | 'admin';
 
 export default function Dashboard() {
   const { profile, signOut } = useAuth();
@@ -62,6 +73,8 @@ export default function Dashboard() {
         return ['manager', 'admin'].includes(profile.role);
       case 'users':
         return profile.role === 'admin';
+      case 'admin':
+        return profile.role === 'admin';
       default:
         return false;
     }
@@ -89,6 +102,8 @@ export default function Dashboard() {
         return <SyncQueue />;
       case 'export':
         return <ExportCounts />;
+      case 'admin':
+        return <AdminDashboard />;
       default:
         return <StocktakeEntry />;
     }
@@ -214,6 +229,10 @@ export default function Dashboard() {
                 <NavButton page="export" label="Export" icon={<Download className="w-4 h-4" />} />
               )}
 
+              {canAccessPage('admin') && (
+                <NavButton page="admin" label="Admin" icon={<Settings className="w-4 h-4" />} />
+              )}
+
               <div className="flex items-center gap-3 ml-4 pl-4 border-l border-gray-200">
                 <div className="text-right">
                   <p className="text-sm font-medium text-gray-800">{profile?.full_name}</p>
@@ -303,6 +322,10 @@ export default function Dashboard() {
 
               {canAccessPage('export') && (
                 <MobileNavButton page="export" label="Export" icon={<Download className="w-5 h-5" />} />
+              )}
+
+              {canAccessPage('admin') && (
+                <MobileNavButton page="admin" label="Admin" icon={<Settings className="w-5 h-5" />} />
               )}
 
               <div className="pt-3 border-t border-gray-200">
